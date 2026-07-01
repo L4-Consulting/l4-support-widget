@@ -4,19 +4,53 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>L4 Support Widget — demo</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: Georgia, serif;
+        color: rgb(127, 29, 29);
+        background: rgb(254, 242, 242);
+      }
+
+      button,
+      input,
+      * {
+        font-family: Georgia, serif !important;
+        color: rgb(127, 29, 29) !important;
+        border-color: rgb(127, 29, 29) !important;
+      }
+
+      .host-probe {
+        padding: 1rem;
+      }
+    </style>
   </head>
   <body>
-    <h1>L4 Support Widget demo</h1>
-    <p>Loads the standalone IIFE build and mounts the widget via <code>L4Support.init</code>.</p>
+    <main class="host-probe">
+      <h1>L4 Support Widget demo</h1>
+      <p>Loads the standalone IIFE build and mounts the widget via <code>L4Support.init</code>.</p>
+      <button type="button" data-host-button>Host button</button>
+      <div data-host-leak-probe class="rounded bg-l4-accent p-4 text-white">Host leak probe</div>
+    </main>
 
     <!-- Non-React embed: the IIFE bundle self-registers the element + window.L4Support. -->
     <script src="../dist/l4-support-widget.js"></script>
     <script>
-      L4Support.init({
-        productKey: 'civickit',
-        apiBase: 'https://api.l4consulting.net',
-        getToken: () => null,
-      });
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('styleMode') === 'fallback') {
+        const el = document.createElement('l4-support-widget');
+        el.setAttribute('style-mode', 'fallback');
+        el.setAttribute('product-key', 'civickit');
+        el.setAttribute('api-base', 'https://api.l4consulting.net');
+        document.body.appendChild(el);
+      } else {
+        L4Support.init({
+          productKey: 'civickit',
+          apiBase: 'https://api.l4consulting.net',
+          getToken: () => null,
+        });
+      }
       console.log('L4Support version:', L4Support.version);
     </script>
   </body>

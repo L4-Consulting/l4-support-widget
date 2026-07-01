@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+@theme {
+  --font-l4-spike: "L4 Spike Shadow Font", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --color-l4-accent: #2563eb;
+}
+
+/*
+  Shadow-root adaptation for Tailwind 4:
+  - Theme variables and preflight that Tailwind normally places on document-level
+    selectors are re-established on :host / the widget root.
+  - The host boundary gets `all: initial` so inherited host rules do not cross in.
+*/
+@layer base {
+  :host {
+    all: initial;
+    color: #0f172a;
+    font-family: var(--font-l4-spike);
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  :host,
+  :host *,
+  :host ::before,
+  :host ::after {
+    box-sizing: border-box;
+  }
+
+  :host button,
+  :host input {
+    font: inherit;
+  }
+
+  :host button {
+    cursor: pointer;
+  }
+}
+
+@layer components {
+  .l4-spike-shell {
+    isolation: isolate;
+  }
+}
