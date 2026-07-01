@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 
 const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf8')) as {
   version: string;
@@ -31,7 +32,7 @@ export default defineConfig(({ mode }) => {
   if (isGlobal) {
     // IIFE — bundles React, side-effectful standalone <script> entry.
     return {
-      plugins: [react()],
+      plugins: [react(), tailwindcss()],
       define: {
         'process.env.NODE_ENV': JSON.stringify('production'),
         ...VERSION_DEFINE,
@@ -50,7 +51,7 @@ export default defineConfig(({ mode }) => {
 
   // ESM — side-effect-free, React external. Runs second so it must not wipe dist/.
   return {
-    plugins: [react()],
+    plugins: [react(), tailwindcss()],
     define: {
       ...VERSION_DEFINE,
     },

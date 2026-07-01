@@ -23,4 +23,4 @@ if (typeof window !== 'undefined') {
   window.L4Support = L4Support;
 }
 
-export { L4Support };
+export { init, setTokenProvider, version };

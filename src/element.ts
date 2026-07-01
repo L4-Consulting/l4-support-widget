@@ -1,42 +1,62 @@
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { HelloWidget } from './HelloWidget';
+import { DemoWidget } from './DemoWidget';
+import { injectDocumentFonts, injectWidgetStyles, type StyleInjectionMode } from './styles';
 import { version } from './version';
 
 /** Tag name for the widget custom element. */
 export const ELEMENT_NAME = 'l4-support-widget';
 
 /**
- * The custom element. Creates a shadow root and mounts a minimal React tree.
- *
- * Scope for THIS task: shadow root + React "hello" render + version wiring only.
- * The Tailwind-in-shadow / adopted-stylesheet proof is deliberately deferred to
- * the next task (v2 plan, Task 1b spike gate).
+ * The custom element. Creates a shadow root, injects compiled Tailwind CSS, and
+ * mounts a minimal React spike tree. This stays intentionally below real tab UI:
+ * it proves the shell mechanics that the later widget can build on.
  */
 export class L4SupportElement extends HTMLElement {
   #root: Root | null = null;
+  #mount: HTMLDivElement | null = null;
+  #portalContainer: HTMLDivElement | null = null;
 
   connectedCallback(): void {
     if (this.#root) return;
 
     const shadow = this.shadowRoot ?? this.attachShadow({ mode: 'open' });
+    injectDocumentFonts(document);
+    const styleResult = injectWidgetStyles(shadow, {
+      forceFallback: this.getAttribute('style-mode') === 'fallback',
+    });
 
     // Version diagnostics surfaced on the element (v2 plan §2, runtime-drift note).
     this.setAttribute('data-l4-widget-version', version);
+    this.setAttribute('data-l4-style-mode', styleResult.mode);
 
     const mount = document.createElement('div');
     mount.setAttribute('data-l4-widget-root', '');
+    mount.setAttribute('data-l4-style-mode', styleResult.mode);
     shadow.appendChild(mount);
 
+    const portalContainer = document.createElement('div');
+    portalContainer.setAttribute('data-l4-portal-root', '');
+    shadow.appendChild(portalContainer);
+
+    this.#mount = mount;
+    this.#portalContainer = portalContainer;
+
     this.#root = createRoot(mount);
-    this.#root.render(createElement(HelloWidget));
+    this.#root.render(createElement(DemoWidget, { shadowRoot: shadow, portalContainer }));
   }
 
   disconnectedCallback(): void {
     this.#root?.unmount();
     this.#root = null;
+    this.#mount?.remove();
+    this.#portalContainer?.remove();
+    this.#mount = null;
+    this.#portalContainer = null;
   }
 }
+
+export type { StyleInjectionMode };
 
 /**
  * Register the custom element. Idempotent and SSR-safe: no-ops when there is no

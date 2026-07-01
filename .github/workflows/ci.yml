@@ -40,7 +40,7 @@ jobs:
         run: npm run size
 
   e2e:
-    name: Playwright (shadow-DOM smoke)
+    name: Playwright (shadow-DOM spike)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
