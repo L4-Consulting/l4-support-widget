@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>L4 Support Widget — demo</title>
+  </head>
+  <body>
+    <h1>L4 Support Widget demo</h1>
+    <p>Loads the standalone IIFE build and mounts the widget via <code>L4Support.init</code>.</p>
+
+    <!-- Non-React embed: the IIFE bundle self-registers the element + window.L4Support. -->
+    <script src="../dist/l4-support-widget.js"></script>
+    <script>
+      L4Support.init({
+        productKey: 'civickit',
+        apiBase: 'https://api.l4consulting.net',
+        getToken: () => null,
+      });
+      console.log('L4Support version:', L4Support.version);
+    </script>
+  </body>
+</html>
