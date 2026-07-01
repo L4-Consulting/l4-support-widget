@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ELEMENT_NAME, registerElement } from '../src/element';
+import { setTokenProvider } from '../src/public-api';
 
 describe('l4-support-widget custom element', () => {
   beforeEach(() => {
@@ -12,9 +13,12 @@ describe('l4-support-widget custom element', () => {
     expect(customElements.get(ELEMENT_NAME)).toBeTypeOf('function');
   });
 
-  it('attaches a shadow root and mounts the React spike shell', async () => {
+  it('attaches a shadow root and mounts the support launcher', async () => {
     registerElement();
+    setTokenProvider(() => 'tok');
     const el = document.createElement(ELEMENT_NAME);
+    el.setAttribute('product-key', 'civickit');
+    el.setAttribute('api-base', 'https://api.example.test');
     document.body.appendChild(el);
 
     // React render is async; wait a tick for the root to flush.
@@ -22,14 +26,17 @@ describe('l4-support-widget custom element', () => {
 
     expect(el.shadowRoot).not.toBeNull();
     const text = el.shadowRoot?.textContent ?? '';
-    expect(text).toContain('Shadow DOM spike');
+    expect(text).toContain('Support');
     expect(el.shadowRoot?.querySelector('[data-l4-widget-root]')).not.toBeNull();
     expect(el.shadowRoot?.querySelector('[data-l4-portal-root]')).not.toBeNull();
   });
 
   it('stamps the version onto a data attribute', async () => {
     registerElement();
+    setTokenProvider(() => 'tok');
     const el = document.createElement(ELEMENT_NAME);
+    el.setAttribute('product-key', 'civickit');
+    el.setAttribute('api-base', 'https://api.example.test');
     document.body.appendChild(el);
     await new Promise((r) => setTimeout(r, 0));
 
@@ -38,8 +45,11 @@ describe('l4-support-widget custom element', () => {
 
   it('can use the style-tag fallback mode for non-constructable stylesheet engines', async () => {
     registerElement();
+    setTokenProvider(() => 'tok');
     const el = document.createElement(ELEMENT_NAME);
     el.setAttribute('style-mode', 'fallback');
+    el.setAttribute('product-key', 'civickit');
+    el.setAttribute('api-base', 'https://api.example.test');
     document.body.appendChild(el);
     await new Promise((r) => setTimeout(r, 0));
 

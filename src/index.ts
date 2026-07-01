@@ -9,8 +9,8 @@
  * `package.json` has "sideEffects": false and its `exports` map only exposes this
  * build — ESM consumers never pull the side-effectful global bundle.
  */
-export { init, setTokenProvider, version } from './public-api';
-export type { L4SupportInit, TokenProvider } from './public-api';
+export { destroy, init, open, setTokenProvider, version } from './public-api';
+export type { L4SupportInit, TokenProvider } from './config';
 export type {
   SupportCase,
   CaseDetail,

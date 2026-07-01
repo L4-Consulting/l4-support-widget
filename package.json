@@ -30,10 +30,6 @@
     "test:e2e": "playwright test",
     "size": "node scripts/bundle-size.mjs"
   },
-  "peerDependencies": {
-    "react": "^19.0.0 || ^18.0.0",
-    "react-dom": "^19.0.0 || ^18.0.0"
-  },
   "peerDependenciesMeta": {
     "react": {
       "optional": true
@@ -46,8 +42,12 @@
     "vite": "6.4.3"
   },
   "dependencies": {
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0 || ^18.0.0",
+    "react-dom": "^19.0.0 || ^18.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",
@@ -55,8 +55,8 @@
     "@tailwindcss/vite": "^4.3.2",
     "@testing-library/react": "^16.1.0",
     "@types/node": "^22.10.5",
-    "@types/react": "^19.0.7",
-    "@types/react-dom": "^19.0.3",
+    "@types/react": "^18.3.23",
+    "@types/react-dom": "^18.3.7",
     "@typescript-eslint/eslint-plugin": "^8.20.0",
     "@typescript-eslint/parser": "^8.20.0",
     "@vitejs/plugin-react": "^4.3.4",

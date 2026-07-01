@@ -38,6 +38,7 @@
     <script src="../dist/l4-support-widget.js"></script>
     <script>
       const params = new URLSearchParams(window.location.search);
+      L4Support.setTokenProvider(() => 'demo-token');
       if (params.get('styleMode') === 'fallback') {
         const el = document.createElement('l4-support-widget');
         el.setAttribute('style-mode', 'fallback');
@@ -48,7 +49,7 @@
         L4Support.init({
           productKey: 'civickit',
           apiBase: 'https://api.l4consulting.net',
-          getToken: () => null,
+          getToken: () => 'demo-token',
         });
       }
       console.log('L4Support version:', L4Support.version);
