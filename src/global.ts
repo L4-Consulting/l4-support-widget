@@ -6,12 +6,12 @@
  * non-React (or differently-versioned-React) host page works standalone.
  */
 import { registerElement } from './element';
-import { init, setTokenProvider, version } from './public-api';
+import { destroy, init, open, setTokenProvider, version } from './public-api';
 
 // Self-register the element for declarative <l4-support-widget> usage.
 registerElement();
 
-const L4Support = { init, setTokenProvider, version } as const;
+const L4Support = { destroy, init, open, setTokenProvider, version } as const;
 
 declare global {
   interface Window {
@@ -23,4 +23,4 @@ if (typeof window !== 'undefined') {
   window.L4Support = L4Support;
 }
 
-export { init, setTokenProvider, version };
+export { destroy, init, open, setTokenProvider, version };

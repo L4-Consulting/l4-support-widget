@@ -1,7 +1,9 @@
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { DemoWidget } from './DemoWidget';
+import { App } from './App';
+import type { L4SupportInit } from './config';
 import { injectDocumentFonts, injectWidgetStyles, type StyleInjectionMode } from './styles';
+import { getStoredTokenProvider } from './token-provider';
 import { version } from './version';
 
 /** Tag name for the widget custom element. */
@@ -16,9 +18,14 @@ export class L4SupportElement extends HTMLElement {
   #root: Root | null = null;
   #mount: HTMLDivElement | null = null;
   #portalContainer: HTMLDivElement | null = null;
+  #config: L4SupportInit | null = null;
+  #openSignal = 0;
 
   connectedCallback(): void {
-    if (this.#root) return;
+    if (this.#root) {
+      this.#render();
+      return;
+    }
 
     const shadow = this.shadowRoot ?? this.attachShadow({ mode: 'open' });
     injectDocumentFonts(document);
@@ -43,7 +50,7 @@ export class L4SupportElement extends HTMLElement {
     this.#portalContainer = portalContainer;
 
     this.#root = createRoot(mount);
-    this.#root.render(createElement(DemoWidget, { shadowRoot: shadow, portalContainer }));
+    this.#render();
   }
 
   disconnectedCallback(): void {
@@ -53,6 +60,39 @@ export class L4SupportElement extends HTMLElement {
     this.#portalContainer?.remove();
     this.#mount = null;
     this.#portalContainer = null;
+  }
+
+  configure(config: L4SupportInit): void {
+    this.#config = config;
+    this.#render();
+  }
+
+  open(): void {
+    this.#openSignal += 1;
+    this.#render();
+  }
+
+  #render(): void {
+    const shadow = this.shadowRoot;
+    if (!this.#root || !shadow || !this.#portalContainer) return;
+    const config = this.#config ?? this.#configFromAttributes();
+    if (!config) return;
+    this.#root.render(
+      createElement(App, {
+        config,
+        openSignal: this.#openSignal,
+        shadowRoot: shadow,
+        portalContainer: this.#portalContainer,
+      }),
+    );
+  }
+
+  #configFromAttributes(): L4SupportInit | null {
+    const productKey = this.getAttribute('product-key');
+    const apiBase = this.getAttribute('api-base');
+    const getToken = getStoredTokenProvider() ?? undefined;
+    if (!productKey || !apiBase || !getToken) return null;
+    return { productKey, apiBase, getToken };
   }
 }
 
