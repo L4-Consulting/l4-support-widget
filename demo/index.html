@@ -50,6 +50,10 @@
           productKey: 'civickit',
           apiBase: 'https://api.l4consulting.net',
           getToken: () => 'demo-token',
+          theme: {
+            accent: params.get('accent') || undefined,
+            mode: params.get('theme') || undefined,
+          },
         });
       }
       console.log('L4Support version:', L4Support.version);

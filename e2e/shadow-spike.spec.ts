@@ -142,6 +142,60 @@ test('launcher opens and closes the panel, and default tabs render with support 
   await expect.poll(() => shadowEval(page, (root) => Boolean(root.querySelector('[data-l4-panel]')))).toBe(false);
 });
 
+test('launcher, dialog, and tab bar expose accessible roles and labels', async ({ page }) => {
+  await waitForWidget(page);
+  await openPanel(page);
+
+  const a11y = await shadowEval(page, (root) => ({
+    launcherLabel: root.querySelector('[data-l4-launcher]')?.getAttribute('aria-label'),
+    dialogLabel: root.querySelector('[data-l4-panel]')?.getAttribute('aria-label'),
+    closeLabel: root.querySelector('[data-l4-close-panel]')?.getAttribute('aria-label'),
+    tablistLabel: root.querySelector('[role="tablist"]')?.getAttribute('aria-label'),
+    tabCount: root.querySelectorAll('[role="tab"]').length,
+    selectedTab: root.querySelector('[role="tab"][aria-selected="true"]')?.textContent?.trim(),
+    tabPanelRole: root.querySelector('main')?.getAttribute('role'),
+  }));
+
+  expect(a11y).toEqual({
+    launcherLabel: 'Open support',
+    dialogLabel: 'L4 Support',
+    closeLabel: 'Close support',
+    tablistLabel: 'Support widget tabs',
+    tabCount: 3,
+    selectedTab: 'My Support',
+    tabPanelRole: 'tabpanel',
+  });
+});
+
+test('theme accent and dark mode change computed styles inside the shadow root', async ({ page }) => {
+  await mockSupportApi(page);
+  await page.goto('/demo/index.html?accent=%23dc2626&theme=dark');
+  await page.waitForSelector('l4-support-widget', { state: 'attached' });
+  await page.waitForFunction(() => {
+    const host = document.querySelector('l4-support-widget');
+    return Boolean(host?.shadowRoot?.querySelector('[data-l4-launcher]'));
+  });
+  await openPanel(page);
+
+  const darkTheme = await shadowEval(page, (root) => {
+    const launcher = root.querySelector<HTMLElement>('[data-l4-launcher]');
+    const panel = root.querySelector<HTMLElement>('[data-l4-panel]');
+    const card = root.querySelector<HTMLElement>('[data-l4-card]');
+    if (!launcher || !panel || !card) throw new Error('missing themed elements');
+    return {
+      launcherBackground: getComputedStyle(launcher).backgroundColor,
+      panelBackground: getComputedStyle(panel).backgroundColor,
+      cardBackground: getComputedStyle(card).backgroundColor,
+      panelColor: getComputedStyle(panel).color,
+    };
+  });
+
+  expect(darkTheme.launcherBackground).toBe('rgb(220, 38, 38)');
+  expect(darkTheme.panelBackground).toBe('rgb(15, 23, 42)');
+  expect(darkTheme.cardBackground).toBe('rgb(17, 24, 39)');
+  expect(darkTheme.panelColor).toBe('rgb(248, 250, 252)');
+});
+
 test('shadow-aware focus trap cycles inside the panel and Escape closes it', async ({ page }) => {
   await waitForWidget(page);
   await openPanel(page);

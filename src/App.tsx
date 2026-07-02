@@ -13,6 +13,7 @@ import {
 import { ConfigContext, emitEvent, normalizeConfig, type L4SupportInit, type NormalizedConfig } from './config';
 import { createShadowFocusTrap, type ShadowFocusTrap } from './focus-trap';
 import { ShadowPortal } from './portal';
+import { strings } from './strings';
 import { TabStateContext, type OpenSupportOptions } from './tab-state';
 import { HelpTab } from './tabs/HelpTab';
 import { RoadmapTab } from './tabs/RoadmapTab';
@@ -55,8 +56,9 @@ function WidgetApp({ config: rawConfig, openSignal, shadowRoot, portalContainer 
   return (
     <ConfigContext.Provider value={config}>
       <div
-        className="font-l4-spike text-slate-900"
+        className="font-l4-spike"
         style={{ '--color-l4-accent': config.theme.accent } as CSSProperties}
+        data-l4-theme={config.theme.mode}
         data-l4-app
       >
         {config.launcher.enabled ? <Launcher config={config} onOpen={openPanel} /> : null}
@@ -76,9 +78,9 @@ function Launcher({ config, onOpen }: { config: NormalizedConfig; onOpen: () => 
       type="button"
       data-l4-launcher
       onClick={onOpen}
-      aria-label="Open support"
+      aria-label={strings.launcherLabel}
     >
-      Support
+      {strings.launcherText}
     </button>
   );
 }
@@ -119,7 +121,7 @@ function PanelPortal({
   const openSupportWith = useCallback((options: OpenSupportOptions = {}) => {
     if (typeof options.subject === 'string') setSupportDraftSubject(options.subject);
     if (activeTabs.includes('support')) setActiveTab('support');
-    emitEvent(config, { type: 'deflect_to_support', subject: options.subject ?? '' });
+    emitEvent(config, { type: 'deflect', subject: options.subject ?? '' });
   }, [activeTabs, config]);
 
   const tabState = useMemo(
@@ -129,19 +131,25 @@ function PanelPortal({
 
   return (
     <ShadowPortal container={portalContainer}>
-      <div className="fixed inset-0 z-50 bg-slate-950/25 p-0 font-l4-spike sm:p-4" data-l4-panel-backdrop>
+      <div
+        className="fixed inset-0 z-50 bg-slate-950/25 p-0 font-l4-spike sm:p-4"
+        style={{ '--color-l4-accent': config.theme.accent } as CSSProperties}
+        data-l4-app
+        data-l4-theme={config.theme.mode}
+        data-l4-panel-backdrop
+      >
         <section
           ref={panelRef}
           className="ml-auto flex h-full w-full flex-col bg-slate-50 text-slate-900 shadow-2xl focus:outline-none sm:max-w-4xl sm:rounded-lg"
           role="dialog"
           aria-modal="true"
-          aria-label="L4 Support"
+          aria-label={strings.widgetTitle}
           tabIndex={-1}
           data-l4-panel
         >
-          <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
+          <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3" data-l4-surface>
             <div>
-              <h2 className="text-base font-semibold">L4 Support</h2>
+              <h2 className="text-base font-semibold">{strings.widgetTitle}</h2>
               <p className="text-xs text-slate-500">v{version}</p>
             </div>
             <button
@@ -149,11 +157,12 @@ function PanelPortal({
               type="button"
               data-l4-close-panel
               onClick={onClose}
+              aria-label={strings.closePanelLabel}
             >
-              Close
+              {strings.closePanel}
             </button>
           </header>
-          <nav className="flex gap-1 border-b border-slate-200 bg-white px-4 pt-2" aria-label="Support widget tabs">
+          <nav className="flex gap-1 border-b border-slate-200 bg-white px-4 pt-2" aria-label={strings.tabsLabel} role="tablist" data-l4-surface>
             {activeTabs.map((tab) => (
               <button
                 key={tab}
@@ -162,7 +171,11 @@ function PanelPortal({
                 }`}
                 type="button"
                 data-l4-tab={tab}
+                id={`l4-tab-${tab}`}
+                role="tab"
                 aria-selected={activeTab === tab}
+                aria-controls={`l4-panel-${tab}`}
+                tabIndex={activeTab === tab ? 0 : -1}
                 onClick={() => setActiveTab(tab)}
               >
                 {tabLabel(tab)}
@@ -170,7 +183,7 @@ function PanelPortal({
             ))}
           </nav>
           <TabStateContext.Provider value={tabState}>
-            <main className="min-h-0 flex-1 overflow-auto p-4">
+            <main className="min-h-0 flex-1 overflow-auto p-4" role="tabpanel" id={`l4-panel-${activeTab}`} aria-labelledby={`l4-tab-${activeTab}`}>
               {activeTab === 'help' ? <HelpTab supportEnabled={activeTabs.includes('support')} /> : null}
               {activeTab === 'support' ? <SupportTab /> : null}
               {activeTab === 'roadmap' ? <RoadmapTab /> : null}
@@ -183,9 +196,9 @@ function PanelPortal({
 }
 
 function tabLabel(tab: 'help' | 'support' | 'roadmap'): string {
-  if (tab === 'help') return 'Help';
-  if (tab === 'roadmap') return 'Roadmap';
-  return 'My Support';
+  if (tab === 'help') return strings.helpTab;
+  if (tab === 'roadmap') return strings.roadmapTab;
+  return strings.supportTitle;
 }
 
 class RootErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
@@ -201,7 +214,11 @@ class RootErrorBoundary extends Component<{ children: ReactNode }, { failed: boo
 
   render(): ReactNode {
     if (this.state.failed) {
-      return <div data-l4-error-boundary />;
+      return (
+        <div data-l4-error-boundary data-l4-app data-l4-theme="light" role="alert">
+          {strings.boundaryFallback}
+        </div>
+      );
     }
     return this.props.children;
   }

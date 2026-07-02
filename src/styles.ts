@@ -39,6 +39,10 @@ export function injectDocumentFonts(doc: Document = document): HTMLStyleElement 
   return style;
 }
 
+export function removeDocumentFonts(doc: Document = document): void {
+  doc.getElementById(FONT_STYLE_ID)?.remove();
+}
+
 export function injectWidgetStyles(
   shadowRoot: ShadowRoot,
   options: { forceFallback?: boolean } = {},

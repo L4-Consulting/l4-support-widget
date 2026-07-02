@@ -31,14 +31,14 @@ export function RoadmapTab(): JSX.Element {
     };
   }, [api]);
 
-  if (state === 'loading') return <p className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600">Loading roadmap...</p>;
-  if (state === 'error') return <p className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-red-700" role="alert">Could not load roadmap.</p>;
-  if (items.length === 0) return <p className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600">{strings.noRoadmap}</p>;
+  if (state === 'loading') return <StateMessage tone="loading">{strings.roadmapLoading}</StateMessage>;
+  if (state === 'error') return <StateMessage tone="error">{strings.roadmapError}</StateMessage>;
+  if (items.length === 0) return <StateMessage tone="empty">{strings.noRoadmap}</StateMessage>;
 
   return (
     <section className="space-y-4" data-l4-roadmap-tab>
       {groupRoadmapItems(items).map((group) => (
-        <section key={group.heading} className="rounded-lg border border-slate-200 bg-white">
+        <section key={group.heading} className="rounded-lg border border-slate-200 bg-white" data-l4-card>
           <div className="border-b border-slate-200 px-4 py-3">
             <h3 className="text-sm font-semibold text-slate-900">{group.heading}</h3>
           </div>
@@ -56,5 +56,19 @@ export function RoadmapTab(): JSX.Element {
         </section>
       ))}
     </section>
+  );
+}
+
+function StateMessage({ children, tone }: { children: string; tone: 'empty' | 'loading' | 'error' }): JSX.Element {
+  return (
+    <p
+      className={`rounded-lg border border-slate-200 bg-white p-4 text-sm ${tone === 'error' ? 'text-red-700' : 'text-slate-600'}`}
+      role={tone === 'error' ? 'alert' : 'status'}
+      aria-live="polite"
+      data-l4-card
+      data-l4-state={tone}
+    >
+      {children}
+    </p>
   );
 }

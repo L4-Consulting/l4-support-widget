@@ -1,5 +1,6 @@
 import { ELEMENT_NAME, registerElement } from './element';
 import { ConfigError, normalizeConfig, type L4SupportInit, type TokenProvider } from './config';
+import { removeDocumentFonts } from './styles';
 import { getStoredTokenProvider, setStoredTokenProvider } from './token-provider';
 import { version } from './version';
 
@@ -70,8 +71,11 @@ export function open(): void {
 }
 
 export function destroy(): void {
-  document.querySelector(ELEMENT_NAME)?.remove();
+  if (typeof document === 'undefined') return;
+  document.querySelectorAll(ELEMENT_NAME).forEach((el) => el.remove());
+  removeDocumentFonts(document);
   lastConfig = null;
+  lastError = null;
 }
 
 export { version };

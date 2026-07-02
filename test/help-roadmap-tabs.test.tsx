@@ -133,13 +133,13 @@ describe('HelpTab', () => {
     };
 
     render(<App config={init} openSignal={1} shadowRoot={shadowRoot} portalContainer={portalContainer} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Help' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Help' }));
     fireEvent.change(screen.getByLabelText('Search help articles'), { target: { value: 'refund problem' } });
     await waitForDebounce();
     await screen.findByText('No help articles yet');
     fireEvent.click(screen.getByRole('button', { name: 'Still stuck? File a case' }));
 
-    expect(screen.getByRole('button', { name: 'My Support' }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByRole('tab', { name: 'My Support' }).getAttribute('aria-selected')).toBe('true');
     await waitFor(() => expect((screen.getByLabelText('Subject') as HTMLInputElement).value).toBe('refund problem'));
   });
 });

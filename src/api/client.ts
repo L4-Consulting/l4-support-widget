@@ -8,6 +8,7 @@ import type {
   RoadmapResponse,
 } from './types';
 import { emitEvent, type NormalizedConfig, type WidgetEvent } from '../config';
+import { strings } from '../strings';
 
 export interface ValidationPayload {
   error: string;
@@ -15,14 +16,14 @@ export interface ValidationPayload {
 }
 
 export class SessionExpiredError extends Error {
-  constructor(message = 'Your support session has expired.') {
+  constructor(message = strings.sessionExpired) {
     super(message);
     this.name = 'SessionExpiredError';
   }
 }
 
 export class NotEnabledError extends Error {
-  constructor(message = "support isn't enabled for your account") {
+  constructor(message = strings.notEnabled) {
     super(message);
     this.name = 'NotEnabledError';
   }
@@ -32,7 +33,7 @@ export class RateLimitedError extends Error {
   retryAfter: number | null;
 
   constructor(retryAfter: number | null) {
-    super('Too many support requests. Try again later.');
+    super(strings.rateLimited);
     this.name = 'RateLimitedError';
     this.retryAfter = retryAfter;
   }
@@ -42,21 +43,21 @@ export class ValidationError extends Error {
   details?: unknown;
 
   constructor(payload: ValidationPayload) {
-    super(payload.error || 'The support request was not valid.');
+    super(payload.error || strings.validationError);
     this.name = 'ValidationError';
     this.details = payload.details;
   }
 }
 
 export class ServerError extends Error {
-  constructor(message = 'Support is temporarily unavailable.') {
+  constructor(message = strings.genericError) {
     super(message);
     this.name = 'ServerError';
   }
 }
 
 export class NotFoundError extends Error {
-  constructor(message = "This case isn't available.") {
+  constructor(message = strings.caseUnavailable) {
     super(message);
     this.name = 'NotFoundError';
   }
@@ -127,7 +128,7 @@ export class ApiClient {
       if (!state.retriedServer) {
         return this.#request<T>(path, options, { ...state, retriedServer: true });
       }
-      this.#emit({ type: 'support_error', status: 'network' });
+      this.#emit({ type: 'server_error', status: 'network' });
       throw new ServerError();
     }
 
@@ -146,14 +147,18 @@ export class ApiClient {
 
     if (response.status === 403) throw new NotEnabledError();
     if (response.status === 404) throw new NotFoundError();
-    if (response.status === 429) throw new RateLimitedError(parseRetryAfter(response.headers.get('Retry-After')));
+    if (response.status === 429) {
+      const retryAfter = parseRetryAfter(response.headers.get('Retry-After'));
+      this.#emit({ type: 'rate_limited', status: 429, retryAfter });
+      throw new RateLimitedError(retryAfter);
+    }
     if (response.status === 400) throw new ValidationError(await readValidation(response));
 
     if (response.status >= 500) {
       if (!state.retriedServer) {
         return this.#request<T>(path, options, { ...state, retriedServer: true });
       }
-      this.#emit({ type: 'support_error', status: response.status });
+      this.#emit({ type: 'server_error', status: response.status });
       throw new ServerError();
     }
 
@@ -169,7 +174,7 @@ async function readValidation(response: Response): Promise<ValidationPayload> {
   try {
     return (await response.json()) as ValidationPayload;
   } catch {
-    return { error: 'The support request was not valid.' };
+    return { error: strings.validationError };
   }
 }
 

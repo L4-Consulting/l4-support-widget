@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type JSX } from 'react';
-import { ApiClient, NotFoundError } from '../api/client';
+import { ApiClient, NotEnabledError, NotFoundError, RateLimitedError, ServerError, SessionExpiredError, ValidationError } from '../api/client';
 import type { CaseCategory, CaseDetail, CaseMessage, CaseSeverity, SupportCase } from '../api/types';
 import { emitEvent, useConfig } from '../config';
 import { strings } from '../strings';
@@ -91,7 +91,7 @@ export function SupportTab(): JSX.Element {
     const category = String(data.get('category') ?? 'other') as CaseCategory;
     const severity = String(data.get('severity') ?? 'normal') as CaseSeverity;
     if (!nextSubject) {
-      setFormError('Subject is required.');
+      setFormError(strings.subjectRequired);
       return;
     }
 
@@ -104,12 +104,12 @@ export function SupportTab(): JSX.Element {
       });
       setCases((current) => [created, ...current.filter((item) => item.id !== created.id)]);
       setSelectedId(created.id);
-      setFormSuccess('Case submitted.');
-      emitEvent(config, { type: 'support_case_created', caseId: created.id });
+      setFormSuccess(strings.caseSubmitted);
+      emitEvent(config, { type: 'submit', caseId: created.id });
       form.reset();
       setSubject('');
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : strings.genericError);
+      setFormError(apiErrorMessage(error));
     }
   }
 
@@ -121,7 +121,7 @@ export function SupportTab(): JSX.Element {
     const data = new FormData(form);
     const body = String(data.get('body') ?? '').trim();
     if (!body) {
-      setReplyError('Reply is required.');
+      setReplyError(strings.replyRequired);
       return;
     }
     try {
@@ -130,13 +130,13 @@ export function SupportTab(): JSX.Element {
       emitEvent(config, { type: 'support_case_replied', caseId: selectedId });
       form.reset();
     } catch (error) {
-      setReplyError(error instanceof Error ? error.message : strings.genericError);
+      setReplyError(apiErrorMessage(error));
     }
   }
 
   return (
     <div className="grid gap-4 md:grid-cols-[17rem_1fr]" data-l4-support-tab>
-      <form className="rounded-lg border border-slate-200 bg-white p-4" data-l4-support-form onSubmit={onSubmit}>
+      <form className="rounded-lg border border-slate-200 bg-white p-4" data-l4-support-form data-l4-card onSubmit={onSubmit}>
         <h3 className="text-sm font-semibold text-slate-900">{strings.submitTitle}</h3>
         <Field
           label={strings.subjectLabel}
@@ -149,13 +149,13 @@ export function SupportTab(): JSX.Element {
         <Select label={strings.categoryLabel} name="category" values={CATEGORIES} defaultValue="other" />
         <Select label={strings.severityLabel} name="severity" values={SEVERITIES} defaultValue="normal" />
         {formError ? <p className="mt-3 text-sm text-red-700" role="alert">{formError}</p> : null}
-        {formSuccess ? <p className="mt-3 text-sm text-green-700" role="status">{formSuccess}</p> : null}
+        {formSuccess ? <p className="mt-3 text-sm text-green-700" role="status" aria-live="polite">{formSuccess}</p> : null}
         <button className="mt-4 w-full rounded-md bg-l4-accent px-3 py-2 text-sm font-semibold text-white" type="submit">
           {strings.submitButton}
         </button>
       </form>
 
-      <section className="min-h-[22rem] rounded-lg border border-slate-200 bg-white" aria-label="Support cases">
+      <section className="min-h-[22rem] rounded-lg border border-slate-200 bg-white" aria-label={strings.casesLabel} data-l4-card>
         <div className="border-b border-slate-200 p-4">
           <h3 className="text-sm font-semibold text-slate-900">{strings.supportTitle}</h3>
         </div>
@@ -237,9 +237,9 @@ function CasesList({
   selectedId: string | null;
   onSelect: (id: string) => void;
 }): JSX.Element {
-  if (state === 'loading') return <p className="p-4 text-sm text-slate-600">Loading cases...</p>;
-  if (state === 'error') return <p className="p-4 text-sm text-red-700" role="alert">Could not load cases.</p>;
-  if (cases.length === 0) return <p className="p-4 text-sm text-slate-600">{strings.noCases}</p>;
+  if (state === 'loading') return <StateMessage tone="loading">{strings.casesLoading}</StateMessage>;
+  if (state === 'error') return <StateMessage tone="error">{strings.casesError}</StateMessage>;
+  if (cases.length === 0) return <StateMessage tone="empty">{strings.noCases}</StateMessage>;
 
   return (
     <ul className="divide-y divide-slate-200 border-r border-slate-200" data-l4-cases-list>
@@ -270,10 +270,10 @@ function CaseDetailPanel({
   onReply: (event: FormEvent<HTMLFormElement>) => void;
   replyError: string;
 }): JSX.Element {
-  if (state === 'idle') return <p className="p-4 text-sm text-slate-600">Select a case.</p>;
-  if (state === 'loading') return <p className="p-4 text-sm text-slate-600">Loading case...</p>;
-  if (state === 'missing') return <p className="p-4 text-sm text-slate-600">{strings.caseUnavailable}</p>;
-  if (state === 'error' || !detail) return <p className="p-4 text-sm text-red-700" role="alert">Could not load this case.</p>;
+  if (state === 'idle') return <StateMessage tone="empty">{strings.selectCase}</StateMessage>;
+  if (state === 'loading') return <StateMessage tone="loading">{strings.caseLoading}</StateMessage>;
+  if (state === 'missing') return <StateMessage tone="empty">{strings.caseUnavailable}</StateMessage>;
+  if (state === 'error' || !detail) return <StateMessage tone="error">{strings.caseError}</StateMessage>;
 
   return (
     <article className="p-4" data-l4-case-detail>
@@ -288,7 +288,7 @@ function CaseDetailPanel({
       </ol>
       <form className="mt-4 border-t border-slate-200 pt-4" onSubmit={onReply}>
         <label className="block text-sm font-medium text-slate-700">
-          Reply
+          {strings.replyLabel}
           <textarea name="body" className="mt-1 min-h-20 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
         </label>
         {replyError ? <p className="mt-2 text-sm text-red-700" role="alert">{replyError}</p> : null}
@@ -307,4 +307,27 @@ function MessageItem({ message }: { message: CaseMessage }): JSX.Element {
       <p className="mt-1 whitespace-pre-wrap text-slate-700">{message.body}</p>
     </li>
   );
+}
+
+function StateMessage({ children, tone }: { children: string; tone: 'empty' | 'loading' | 'error' }): JSX.Element {
+  return (
+    <p
+      className={`p-4 text-sm ${tone === 'error' ? 'text-red-700' : 'text-slate-600'}`}
+      role={tone === 'error' ? 'alert' : 'status'}
+      aria-live="polite"
+      data-l4-state={tone}
+    >
+      {children}
+    </p>
+  );
+}
+
+function apiErrorMessage(error: unknown): string {
+  if (error instanceof SessionExpiredError) return strings.sessionExpired;
+  if (error instanceof NotEnabledError) return strings.notEnabled;
+  if (error instanceof RateLimitedError) return strings.rateLimited;
+  if (error instanceof ValidationError) return error.message || strings.validationError;
+  if (error instanceof NotFoundError) return strings.caseUnavailable;
+  if (error instanceof ServerError) return strings.genericError;
+  return error instanceof Error ? error.message : strings.genericError;
 }
