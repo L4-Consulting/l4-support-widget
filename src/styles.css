@@ -30,17 +30,99 @@
   }
 
   :host button,
-  :host input {
+  :host input,
+  :host textarea,
+  :host select {
     font: inherit;
   }
 
   :host button {
     cursor: pointer;
   }
+
+  :host :is(button, a, input, textarea, select):focus-visible {
+    outline: 2px solid var(--color-l4-accent);
+    outline-offset: 2px;
+  }
 }
 
 @layer components {
   .l4-spike-shell {
     isolation: isolate;
+  }
+
+  [data-l4-app] {
+    --l4-bg: #f8fafc;
+    --l4-surface: #ffffff;
+    --l4-text: #0f172a;
+    --l4-muted: #475569;
+    --l4-border: #cbd5e1;
+    --l4-soft: #eff6ff;
+    color: var(--l4-text);
+  }
+
+  [data-l4-app][data-l4-theme="dark"] {
+    --l4-bg: #0f172a;
+    --l4-surface: #111827;
+    --l4-text: #f8fafc;
+    --l4-muted: #cbd5e1;
+    --l4-border: #475569;
+    --l4-soft: #172554;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    [data-l4-app][data-l4-theme="auto"] {
+      --l4-bg: #0f172a;
+      --l4-surface: #111827;
+      --l4-text: #f8fafc;
+      --l4-muted: #cbd5e1;
+      --l4-border: #475569;
+      --l4-soft: #172554;
+    }
+  }
+
+  [data-l4-panel] {
+    background: var(--l4-bg) !important;
+    color: var(--l4-text) !important;
+  }
+
+  [data-l4-surface],
+  [data-l4-card] {
+    background: var(--l4-surface) !important;
+    border-color: var(--l4-border) !important;
+    color: var(--l4-text) !important;
+  }
+
+  [data-l4-app] :is(h2, h3, h4, label, .text-slate-900) {
+    color: var(--l4-text) !important;
+  }
+
+  [data-l4-app] :is(.text-slate-500, .text-slate-600, .text-slate-700, [data-l4-state]) {
+    color: var(--l4-muted) !important;
+  }
+
+  [data-l4-app] :is(input, textarea, select, button) {
+    border-color: var(--l4-border) !important;
+  }
+
+  [data-l4-app] :is(input, textarea, select) {
+    background: var(--l4-surface) !important;
+    color: var(--l4-text) !important;
+  }
+
+  [data-l4-app] [aria-selected="true"],
+  [data-l4-app] .bg-blue-50 {
+    background: var(--l4-soft) !important;
+  }
+
+  [data-l4-error-boundary] {
+    margin: 1rem;
+    border: 1px solid var(--l4-border, #cbd5e1);
+    border-radius: 0.5rem;
+    background: var(--l4-surface, #ffffff);
+    color: var(--l4-text, #0f172a);
+    padding: 1rem;
+    font-family: var(--font-l4-spike);
+    font-size: 0.875rem;
   }
 }

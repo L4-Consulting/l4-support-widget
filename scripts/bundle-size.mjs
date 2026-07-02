@@ -1,6 +1,5 @@
 #!/usr/bin/env node
-// Reports the gzipped size of the IIFE bundle against the budget.
-// WARN-only for now (v2 plan: don't hard-fail until the spike task).
+// Enforces the gzipped size of the IIFE bundle against the production budget.
 import { gzipSync } from 'node:zlib';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
@@ -25,10 +24,8 @@ console.log(
 );
 
 if (gzipKb > BUDGET_KB) {
-  console.warn(
-    `::warning::l4-support-widget IIFE bundle is ${gzipKb.toFixed(1)} KB gzip, over the ${BUDGET_KB} KB budget (warn-only until the spike task).`,
+  console.error(
+    `::error::l4-support-widget IIFE bundle is ${gzipKb.toFixed(1)} KB gzip, over the ${BUDGET_KB} KB budget.`,
   );
+  process.exit(1);
 }
-
-// Warn-only: always exit 0 for now.
-process.exit(0);

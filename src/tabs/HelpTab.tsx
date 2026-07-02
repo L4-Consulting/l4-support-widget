@@ -52,9 +52,9 @@ export function HelpTab({ supportEnabled }: { supportEnabled: boolean }): JSX.El
   }
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4" data-l4-help-tab>
+    <section className="rounded-lg border border-slate-200 bg-white p-4" data-l4-help-tab data-l4-card>
       <label className="block text-sm font-medium text-slate-700">
-        Search help articles
+        {strings.searchHelpLabel}
         <input
           className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
           name="help-search"
@@ -65,10 +65,10 @@ export function HelpTab({ supportEnabled }: { supportEnabled: boolean }): JSX.El
       </label>
 
       <div className="mt-4 min-h-40">
-        {state === 'idle' ? <p className="text-sm text-slate-600">{strings.typeToSearch}</p> : null}
-        {state === 'loading' ? <p className="text-sm text-slate-600">Searching help articles...</p> : null}
-        {state === 'error' ? <p className="text-sm text-red-700" role="alert">Could not search help articles.</p> : null}
-        {state === 'ready' && results.length === 0 ? <p className="text-sm text-slate-600">{strings.noHelpArticles}</p> : null}
+        {state === 'idle' ? <StateMessage tone="empty">{strings.typeToSearch}</StateMessage> : null}
+        {state === 'loading' ? <StateMessage tone="loading">{strings.searchHelpLoading}</StateMessage> : null}
+        {state === 'error' ? <StateMessage tone="error">{strings.searchHelpError}</StateMessage> : null}
+        {state === 'ready' && results.length === 0 ? <StateMessage tone="empty">{strings.noHelpArticles}</StateMessage> : null}
         {state === 'ready' && results.length > 0 ? <DocsResults results={results} /> : null}
       </div>
 
@@ -79,11 +79,24 @@ export function HelpTab({ supportEnabled }: { supportEnabled: boolean }): JSX.El
             type="button"
             onClick={() => openSupportWith({ subject: trimmedQuery })}
           >
-            Still stuck? File a case
+            {strings.helpDeflectButton}
           </button>
         </div>
       ) : null}
     </section>
+  );
+}
+
+function StateMessage({ children, tone }: { children: string; tone: 'empty' | 'loading' | 'error' }): JSX.Element {
+  return (
+    <p
+      className={`text-sm ${tone === 'error' ? 'text-red-700' : 'text-slate-600'}`}
+      role={tone === 'error' ? 'alert' : 'status'}
+      aria-live="polite"
+      data-l4-state={tone}
+    >
+      {children}
+    </p>
   );
 }
 

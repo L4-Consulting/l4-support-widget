@@ -36,7 +36,7 @@ jobs:
       - name: Build (global IIFE + ESM)
         run: npm run build:only
 
-      - name: Bundle size (gzip; budget 60KB — reported, not yet enforced)
+      - name: Bundle size (gzip; budget 60KB enforced)
         run: npm run size
 
   e2e:

@@ -157,6 +157,24 @@ describe('ApiClient', () => {
     await expect(new ApiClient(config()).listCases()).rejects.toBeInstanceOf(ServerError);
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
+
+  it('emits rate_limited and server_error telemetry for typed API failures', async () => {
+    const onEvent = vi.fn();
+    server.use(
+      http.get(`${apiBase}/api/client/support/cases`, () =>
+        HttpResponse.json({ error: 'slow' }, { status: 429, headers: { 'Retry-After': '15' } }),
+      ),
+    );
+
+    await expect(new ApiClient(config({ onEvent })).listCases()).rejects.toBeInstanceOf(RateLimitedError);
+    expect(onEvent).toHaveBeenCalledWith({ type: 'rate_limited', status: 429, retryAfter: 15 });
+
+    onEvent.mockClear();
+    server.use(http.get(`${apiBase}/api/client/support/cases`, () => HttpResponse.json({ error: 'down' }, { status: 503 })));
+
+    await expect(new ApiClient(config({ onEvent })).listCases()).rejects.toBeInstanceOf(ServerError);
+    expect(onEvent).toHaveBeenCalledWith({ type: 'server_error', status: 503 });
+  });
 });
 
 function supportCase(id: string) {
