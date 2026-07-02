@@ -8,6 +8,9 @@ export const strings = {
   submitButton: 'Submit',
   replyButton: 'Reply',
   noCases: 'No cases yet',
+  noHelpArticles: 'No help articles yet',
+  noRoadmap: 'No public roadmap yet',
+  typeToSearch: 'Type at least 3 characters to search.',
   caseUnavailable: "This case isn't available.",
   genericError: 'Support is temporarily unavailable.',
 };

@@ -1,5 +1,6 @@
 import {
   Component,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -12,6 +13,9 @@ import {
 import { ConfigContext, emitEvent, normalizeConfig, type L4SupportInit, type NormalizedConfig } from './config';
 import { createShadowFocusTrap, type ShadowFocusTrap } from './focus-trap';
 import { ShadowPortal } from './portal';
+import { TabStateContext, type OpenSupportOptions } from './tab-state';
+import { HelpTab } from './tabs/HelpTab';
+import { RoadmapTab } from './tabs/RoadmapTab';
 import { SupportTab } from './tabs/SupportTab';
 import { version } from './version';
 
@@ -92,8 +96,15 @@ function PanelPortal({
 }): JSX.Element {
   const panelRef = useRef<HTMLDivElement | null>(null);
   const trapRef = useRef<ShadowFocusTrap | null>(null);
-  const activeTabs = config.tabs.filter((tab) => tab === 'support');
-  const [activeTab] = useState(activeTabs[0] ?? 'support');
+  const activeTabs = config.tabs;
+  const initialTab = activeTabs.includes('support') ? 'support' : (activeTabs[0] ?? 'support');
+  const [activeTab, setActiveTab] = useState<'help' | 'support' | 'roadmap'>(initialTab);
+  const [supportDraftSubject, setSupportDraftSubject] = useState('');
+
+  useEffect(() => {
+    if (activeTabs.includes(activeTab)) return;
+    setActiveTab(activeTabs.includes('support') ? 'support' : (activeTabs[0] ?? 'support'));
+  }, [activeTab, activeTabs]);
 
   useEffect(() => {
     if (!panelRef.current) return;
@@ -104,6 +115,17 @@ function PanelPortal({
       trapRef.current = null;
     };
   }, [onClose, shadowRoot]);
+
+  const openSupportWith = useCallback((options: OpenSupportOptions = {}) => {
+    if (typeof options.subject === 'string') setSupportDraftSubject(options.subject);
+    if (activeTabs.includes('support')) setActiveTab('support');
+    emitEvent(config, { type: 'deflect_to_support', subject: options.subject ?? '' });
+  }, [activeTabs, config]);
+
+  const tabState = useMemo(
+    () => ({ activeTab, supportDraftSubject, openSupportWith }),
+    [activeTab, openSupportWith, supportDraftSubject],
+  );
 
   return (
     <ShadowPortal container={portalContainer}>
@@ -135,20 +157,35 @@ function PanelPortal({
             {activeTabs.map((tab) => (
               <button
                 key={tab}
-                className="border-b-2 border-l4-accent px-3 py-2 text-sm font-semibold text-slate-900"
+                className={`border-b-2 px-3 py-2 text-sm font-semibold ${
+                  activeTab === tab ? 'border-l4-accent text-slate-900' : 'border-transparent text-slate-600'
+                }`}
                 type="button"
                 data-l4-tab={tab}
                 aria-selected={activeTab === tab}
+                onClick={() => setActiveTab(tab)}
               >
-                My Support
+                {tabLabel(tab)}
               </button>
             ))}
           </nav>
-          <main className="min-h-0 flex-1 overflow-auto p-4">{activeTab === 'support' ? <SupportTab /> : null}</main>
+          <TabStateContext.Provider value={tabState}>
+            <main className="min-h-0 flex-1 overflow-auto p-4">
+              {activeTab === 'help' ? <HelpTab supportEnabled={activeTabs.includes('support')} /> : null}
+              {activeTab === 'support' ? <SupportTab /> : null}
+              {activeTab === 'roadmap' ? <RoadmapTab /> : null}
+            </main>
+          </TabStateContext.Provider>
         </section>
       </div>
     </ShadowPortal>
   );
+}
+
+function tabLabel(tab: 'help' | 'support' | 'roadmap'): string {
+  if (tab === 'help') return 'Help';
+  if (tab === 'roadmap') return 'Roadmap';
+  return 'My Support';
 }
 
 class RootErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
