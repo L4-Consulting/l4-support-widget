@@ -22,8 +22,9 @@ afterEach(() => {
 afterAll(() => server.close());
 
 function config(overrides: Partial<NormalizedConfig> = {}): NormalizedConfig {
-  return {
+  const baseConfig: NormalizedConfig = {
     productKey: 'civickit',
+    productLabel: 'civickit',
     apiBase,
     getToken: () => 'tok-1',
     tabs: ['support'],
@@ -31,6 +32,7 @@ function config(overrides: Partial<NormalizedConfig> = {}): NormalizedConfig {
     launcher: { enabled: true, position: 'br' },
     ...overrides,
   };
+  return { ...baseConfig, productLabel: overrides.productLabel ?? baseConfig.productLabel };
 }
 
 describe('ApiClient', () => {

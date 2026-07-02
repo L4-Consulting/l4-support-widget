@@ -18,7 +18,6 @@ import { TabStateContext, type OpenSupportOptions } from './tab-state';
 import { HelpTab } from './tabs/HelpTab';
 import { RoadmapTab } from './tabs/RoadmapTab';
 import { SupportTab } from './tabs/SupportTab';
-import { version } from './version';
 
 export interface AppProps {
   config: L4SupportInit;
@@ -56,7 +55,7 @@ function WidgetApp({ config: rawConfig, openSignal, shadowRoot, portalContainer 
   return (
     <ConfigContext.Provider value={config}>
       <div
-        className="font-l4-spike"
+        className="l4-widget-root"
         style={{ '--color-l4-accent': config.theme.accent } as CSSProperties}
         data-l4-theme={config.theme.mode}
         data-l4-app
@@ -74,7 +73,7 @@ function Launcher({ config, onOpen }: { config: NormalizedConfig; onOpen: () => 
   const sideClass = config.launcher.position === 'bl' ? 'left-5' : 'right-5';
   return (
     <button
-      className={`fixed bottom-5 ${sideClass} z-40 rounded-full bg-l4-accent px-4 py-3 text-sm font-semibold text-white shadow-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2`}
+      className={`l4-launcher ${sideClass}`}
       type="button"
       data-l4-launcher
       onClick={onOpen}
@@ -132,7 +131,7 @@ function PanelPortal({
   return (
     <ShadowPortal container={portalContainer}>
       <div
-        className="fixed inset-0 z-50 bg-slate-950/25 p-0 font-l4-spike sm:p-4"
+        className="l4-panel-backdrop"
         style={{ '--color-l4-accent': config.theme.accent } as CSSProperties}
         data-l4-app
         data-l4-theme={config.theme.mode}
@@ -140,37 +139,38 @@ function PanelPortal({
       >
         <section
           ref={panelRef}
-          className="ml-auto flex h-full w-full flex-col bg-slate-50 text-slate-900 shadow-2xl focus:outline-none sm:max-w-4xl sm:rounded-lg"
+          className="l4-panel"
           role="dialog"
           aria-modal="true"
           aria-label={strings.widgetTitle}
           tabIndex={-1}
           data-l4-panel
         >
-          <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3" data-l4-surface>
+          <header className="l4-panel-header" data-l4-surface>
+            <div className="l4-mark">{strings.headerMark}</div>
             <div>
-              <h2 className="text-base font-semibold">{strings.widgetTitle}</h2>
-              <p className="text-xs text-slate-500">v{version}</p>
+              <h2>{strings.headerTitle}</h2>
+              <p>{config.productLabel}</p>
             </div>
+            <div className="l4-header-grow" />
             <button
-              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700"
+              className="l4-close-button"
               type="button"
               data-l4-close-panel
               onClick={onClose}
               aria-label={strings.closePanelLabel}
             >
-              {strings.closePanel}
+              {strings.closePanelGlyph}
             </button>
           </header>
-          <nav className="flex gap-1 border-b border-slate-200 bg-white px-4 pt-2" aria-label={strings.tabsLabel} role="tablist" data-l4-surface>
+          <nav className="l4-tabs" aria-label={strings.tabsLabel} role="tablist" data-l4-surface>
             {activeTabs.map((tab) => (
               <button
                 key={tab}
-                className={`border-b-2 px-3 py-2 text-sm font-semibold ${
-                  activeTab === tab ? 'border-l4-accent text-slate-900' : 'border-transparent text-slate-600'
-                }`}
+                className="l4-tab"
                 type="button"
                 data-l4-tab={tab}
+                data-active={activeTab === tab}
                 id={`l4-tab-${tab}`}
                 role="tab"
                 aria-selected={activeTab === tab}
@@ -183,7 +183,7 @@ function PanelPortal({
             ))}
           </nav>
           <TabStateContext.Provider value={tabState}>
-            <main className="min-h-0 flex-1 overflow-auto p-4" role="tabpanel" id={`l4-panel-${activeTab}`} aria-labelledby={`l4-tab-${activeTab}`}>
+            <main className="l4-panel-main" role="tabpanel" id={`l4-panel-${activeTab}`} aria-labelledby={`l4-tab-${activeTab}`}>
               {activeTab === 'help' ? <HelpTab supportEnabled={activeTabs.includes('support')} /> : null}
               {activeTab === 'support' ? <SupportTab /> : null}
               {activeTab === 'roadmap' ? <RoadmapTab /> : null}

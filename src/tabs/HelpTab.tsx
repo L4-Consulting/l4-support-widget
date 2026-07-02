@@ -52,11 +52,11 @@ export function HelpTab({ supportEnabled }: { supportEnabled: boolean }): JSX.El
   }
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4" data-l4-help-tab data-l4-card>
-      <label className="block text-sm font-medium text-slate-700">
+    <section className="l4-help-panel" data-l4-help-tab data-l4-card>
+      <label className="l4-help-search-label">
         {strings.searchHelpLabel}
         <input
-          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+          className="l4-help-search"
           name="help-search"
           type="search"
           value={query}
@@ -64,7 +64,7 @@ export function HelpTab({ supportEnabled }: { supportEnabled: boolean }): JSX.El
         />
       </label>
 
-      <div className="mt-4 min-h-40">
+      <div className="l4-help-results">
         {state === 'idle' ? <StateMessage tone="empty">{strings.typeToSearch}</StateMessage> : null}
         {state === 'loading' ? <StateMessage tone="loading">{strings.searchHelpLoading}</StateMessage> : null}
         {state === 'error' ? <StateMessage tone="error">{strings.searchHelpError}</StateMessage> : null}
@@ -73,9 +73,9 @@ export function HelpTab({ supportEnabled }: { supportEnabled: boolean }): JSX.El
       </div>
 
       {supportEnabled ? (
-        <div className="mt-4 border-t border-slate-200 pt-4">
+        <div className="l4-help-deflect">
           <button
-            className="rounded-md bg-l4-accent px-3 py-2 text-sm font-semibold text-white"
+            className="l4-send-button"
             type="button"
             onClick={() => openSupportWith({ subject: trimmedQuery })}
           >
@@ -90,7 +90,7 @@ export function HelpTab({ supportEnabled }: { supportEnabled: boolean }): JSX.El
 function StateMessage({ children, tone }: { children: string; tone: 'empty' | 'loading' | 'error' }): JSX.Element {
   return (
     <p
-      className={`text-sm ${tone === 'error' ? 'text-red-700' : 'text-slate-600'}`}
+      className="l4-help-state"
       role={tone === 'error' ? 'alert' : 'status'}
       aria-live="polite"
       data-l4-state={tone}
@@ -102,11 +102,11 @@ function StateMessage({ children, tone }: { children: string; tone: 'empty' | 'l
 
 function DocsResults({ results }: { results: DocResult[] }): JSX.Element {
   return (
-    <ul className="divide-y divide-slate-200" data-l4-doc-results>
+    <ul className="l4-doc-results" data-l4-doc-results>
       {results.map((result) => (
-        <li key={result.id} className="py-3">
+        <li key={result.id}>
           <a
-            className="text-sm font-semibold text-l4-accent underline-offset-2 hover:underline"
+            className="l4-doc-link"
             href={result.url}
             target="_blank"
             rel="noopener noreferrer"

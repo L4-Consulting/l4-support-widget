@@ -7,7 +7,8 @@ export interface StyleInjectionResult {
   cssText: string;
 }
 
-const FONT_STYLE_ID = 'l4-support-widget-fonts';
+const FONT_LINK_ID = 'l4-support-widget-fonts';
+const FONT_HREF = 'https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap';
 let sharedSheet: CSSStyleSheet | null = null;
 
 function supportsConstructableStyleSheets(shadowRoot: ShadowRoot): boolean {
@@ -18,29 +19,22 @@ function supportsConstructableStyleSheets(shadowRoot: ShadowRoot): boolean {
   );
 }
 
-export function injectDocumentFonts(doc: Document = document): HTMLStyleElement | null {
+export function injectDocumentFonts(doc: Document = document): HTMLLinkElement | null {
   if (typeof doc === 'undefined') return null;
 
-  const existing = doc.getElementById(FONT_STYLE_ID);
-  if (existing instanceof HTMLStyleElement) return existing;
+  const existing = doc.getElementById(FONT_LINK_ID);
+  if (existing instanceof HTMLLinkElement) return existing;
 
-  const style = doc.createElement('style');
-  style.id = FONT_STYLE_ID;
-  style.textContent = `
-@font-face {
-  font-family: "L4 Spike Shadow Font";
-  src: local("Courier New"), local("Courier"), local("Liberation Mono"), local("Menlo");
-  font-style: normal;
-  font-weight: 400 700;
-  font-display: swap;
-}
-`;
-  doc.head.appendChild(style);
-  return style;
+  const link = doc.createElement('link');
+  link.id = FONT_LINK_ID;
+  link.rel = 'stylesheet';
+  link.href = FONT_HREF;
+  doc.head.appendChild(link);
+  return link;
 }
 
 export function removeDocumentFonts(doc: Document = document): void {
-  doc.getElementById(FONT_STYLE_ID)?.remove();
+  doc.getElementById(FONT_LINK_ID)?.remove();
 }
 
 export function injectWidgetStyles(

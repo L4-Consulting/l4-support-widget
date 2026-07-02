@@ -48,7 +48,7 @@ async function openPanel(page: Page) {
   });
 }
 
-test('Tailwind 4 CSS is compiled and injected via adoptedStyleSheets, with a style fallback path', async ({
+test('widget CSS is compiled and injected via adoptedStyleSheets, with a style fallback path', async ({
   page,
 }) => {
   await waitForWidget(page);
@@ -61,8 +61,8 @@ test('Tailwind 4 CSS is compiled and injected via adoptedStyleSheets, with a sty
       mode: (root.host as HTMLElement).getAttribute('data-l4-style-mode'),
       adoptedCount: root.adoptedStyleSheets.length,
       hasFallbackStyleTag: Boolean(root.querySelector('style[data-l4-widget-styles]')),
-      cssHasTailwindLayer: root.adoptedStyleSheets.some((sheet) =>
-        Array.from(sheet.cssRules).some((rule) => rule.cssText.includes('.fixed')),
+      cssHasWidgetLayer: root.adoptedStyleSheets.some((sheet) =>
+        Array.from(sheet.cssRules).some((rule) => rule.cssText.includes('.l4-launcher')),
       ),
       launcherPosition: buttonStyle.position,
       launcherBackground: buttonStyle.backgroundColor,
@@ -73,10 +73,10 @@ test('Tailwind 4 CSS is compiled and injected via adoptedStyleSheets, with a sty
   expect(adopted.mode).toBe('adoptedStyleSheets');
   expect(adopted.adoptedCount).toBeGreaterThan(0);
   expect(adopted.hasFallbackStyleTag).toBe(false);
-  expect(adopted.cssHasTailwindLayer).toBe(true);
+  expect(adopted.cssHasWidgetLayer).toBe(true);
   expect(adopted.launcherPosition).toBe('fixed');
-  expect(adopted.launcherBackground).toBe('rgb(37, 99, 235)');
-  expect(adopted.fontFamily).toContain('L4 Spike Shadow Font');
+  expect(adopted.launcherBackground).toBe('rgb(16, 185, 129)');
+  expect(adopted.fontFamily).toContain('IBM Plex Sans');
 
   await waitForFallbackWidget(page);
   const fallback = await shadowEval(page, (root) => {
@@ -90,7 +90,7 @@ test('Tailwind 4 CSS is compiled and injected via adoptedStyleSheets, with a sty
   });
   expect(fallback.mode).toBe('style');
   expect(fallback.hasFallbackStyleTag).toBe(true);
-  expect(fallback.buttonBackground).toBe('rgb(37, 99, 235)');
+  expect(fallback.buttonBackground).toBe('rgb(16, 185, 129)');
 });
 
 test('style isolation works in both directions across the shadow boundary', async ({ page }) => {
@@ -142,6 +142,45 @@ test('launcher opens and closes the panel, and default tabs render with support 
   await expect.poll(() => shadowEval(page, (root) => Boolean(root.querySelector('[data-l4-panel]')))).toBe(false);
 });
 
+test('operator console geometry and design tokens are applied inside the panel', async ({ page }) => {
+  await waitForWidget(page);
+  await openPanel(page);
+
+  const design = await shadowEval(page, (root) => {
+    const panel = root.querySelector<HTMLElement>('[data-l4-panel]');
+    const list = root.querySelector<HTMLElement>('.l4-case-list-pane');
+    const mark = root.querySelector<HTMLElement>('.l4-mark');
+    const title = root.querySelector<HTMLElement>('.l4-panel-header h2');
+    if (!panel || !list || !mark || !title) throw new Error('missing operator console elements');
+    const panelStyle = getComputedStyle(panel);
+    const listStyle = getComputedStyle(list);
+    const markStyle = getComputedStyle(mark);
+    const titleStyle = getComputedStyle(title);
+    return {
+      panelWidth: Math.round(panel.getBoundingClientRect().width),
+      panelHeight: Math.round(panel.getBoundingClientRect().height),
+      panelRadius: panelStyle.borderRadius,
+      panelBackground: panelStyle.backgroundColor,
+      listWidth: Math.round(list.getBoundingClientRect().width),
+      listBackground: listStyle.backgroundColor,
+      markColor: markStyle.color,
+      titleFont: titleStyle.fontFamily,
+      titleSize: titleStyle.fontSize,
+    };
+  });
+
+  expect(design.panelWidth).toBe(960);
+  expect(design.panelHeight).toBe(640);
+  expect(design.panelRadius).toBe('16px');
+  expect(design.panelBackground).toBe('rgb(255, 255, 255)');
+  expect(design.listWidth).toBe(340);
+  expect(design.listBackground).toBe('rgb(250, 251, 252)');
+  expect(design.markColor).toBe('rgb(255, 255, 255)');
+  expect(design.titleFont).toContain('IBM Plex Sans');
+  expect(design.titleSize).toBe('15.2px');
+});
+
+
 test('launcher, dialog, and tab bar expose accessible roles and labels', async ({ page }) => {
   await waitForWidget(page);
   await openPanel(page);
@@ -191,9 +230,9 @@ test('theme accent and dark mode change computed styles inside the shadow root',
   });
 
   expect(darkTheme.launcherBackground).toBe('rgb(220, 38, 38)');
-  expect(darkTheme.panelBackground).toBe('rgb(15, 23, 42)');
-  expect(darkTheme.cardBackground).toBe('rgb(17, 24, 39)');
-  expect(darkTheme.panelColor).toBe('rgb(248, 250, 252)');
+  expect(darkTheme.panelBackground).toBe('rgb(16, 26, 44)');
+  expect(darkTheme.cardBackground).toBe('rgb(16, 26, 44)');
+  expect(darkTheme.panelColor).toBe('rgb(230, 236, 247)');
 });
 
 test('shadow-aware focus trap cycles inside the panel and Escape closes it', async ({ page }) => {
@@ -222,21 +261,21 @@ test('shadow-aware focus trap cycles inside the panel and Escape closes it', asy
 
 test('document-head font face loads and applies inside the shadow-rendered widget', async ({ page }) => {
   await waitForWidget(page);
-  await page.evaluate(() => document.fonts.ready);
 
   const font = await page.evaluate(() => {
-    const fontStyle = document.head.querySelector('#l4-support-widget-fonts');
+    const fontLink = document.head.querySelector<HTMLLinkElement>('#l4-support-widget-fonts');
     const root = document.querySelector('l4-support-widget')?.shadowRoot;
     const launcher = root?.querySelector<HTMLElement>('[data-l4-launcher]');
     if (!launcher) throw new Error('missing launcher');
     return {
-      hasHeadFontStyle: Boolean(fontStyle),
-      fontFaceRegistered: document.fonts.check('16px "L4 Spike Shadow Font"'),
+      hasHeadFontLink: Boolean(fontLink),
+      fontHref: fontLink?.href,
       widgetFontFamily: getComputedStyle(launcher).fontFamily,
     };
   });
 
-  expect(font.hasHeadFontStyle).toBe(true);
-  expect(font.fontFaceRegistered).toBe(true);
-  expect(font.widgetFontFamily).toContain('L4 Spike Shadow Font');
+  expect(font.hasHeadFontLink).toBe(true);
+  expect(font.fontHref).toContain('IBM+Plex+Sans');
+  expect(font.fontHref).toContain('IBM+Plex+Mono');
+  expect(font.widgetFontFamily).toContain('IBM Plex Sans');
 });

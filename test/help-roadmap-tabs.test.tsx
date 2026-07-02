@@ -16,12 +16,14 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => {
   server.resetHandlers();
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 afterAll(() => server.close());
 
 function config(overrides: Partial<NormalizedConfig> = {}): NormalizedConfig {
-  return {
+  const baseConfig: NormalizedConfig = {
     productKey: 'civickit',
+    productLabel: 'civickit',
     apiBase,
     getToken: () => 'tok',
     tabs: ['help', 'support', 'roadmap'],
@@ -29,6 +31,7 @@ function config(overrides: Partial<NormalizedConfig> = {}): NormalizedConfig {
     launcher: { enabled: true, position: 'br' },
     ...overrides,
   };
+  return { ...baseConfig, productLabel: overrides.productLabel ?? baseConfig.productLabel };
 }
 
 function renderHelp() {
@@ -93,9 +96,9 @@ describe('HelpTab', () => {
     const input = screen.getByLabelText('Search help articles');
     fireEvent.change(input, { target: { value: 'bil' } });
     fireEvent.change(input, { target: { value: 'billing' } });
-    await waitForDebounceWindow();
+    await act(() => wait(100));
     expect(requests).toBe(0);
-    await waitForDebounceRemainder();
+    await waitForDebounce();
 
     const link = await screen.findByRole('link', { name: 'Billing guide' });
     expect(requests).toBe(1);
@@ -199,14 +202,6 @@ function roadmapItem(id: string, title: string, status: string, quarter: string)
 
 function waitForDebounce() {
   return act(() => wait(350));
-}
-
-function waitForDebounceWindow() {
-  return act(() => wait(250));
-}
-
-function waitForDebounceRemainder() {
-  return act(() => wait(100));
 }
 
 function wait(ms: number): Promise<void> {

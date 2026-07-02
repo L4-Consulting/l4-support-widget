@@ -29,18 +29,27 @@ export type CaseSeverity = 'low' | 'normal' | 'high';
 /** A support case as the client sees it in list/detail contexts. */
 export interface SupportCase {
   id: string;
+  case_number?: string;
   subject: string;
   status: string;
   category: CaseCategory;
   severity: CaseSeverity;
   created_at: string;
+  updated_at?: string;
   /** Present when the backend chooses to surface who filed / for whom. */
   contact_name?: string;
   company_name?: string;
+  /** Optional list projection fields from l4-cos listSupportCases. */
+  last_public_message_at?: string | null;
+  last_public_message_author_type?: string | null;
+  last_customer_message_at?: string | null;
+  last_customer_message_preview?: string | null;
+  last_l4_public_reply_at?: string | null;
+  has_unanswered_customer_activity?: boolean | null;
 }
 
 /** Who authored a message on a case, from the client's vantage point. */
-export type MessageAuthorType = 'client' | 'agent' | 'system';
+export type MessageAuthorType = 'client' | 'customer' | 'agent' | 'human' | 'system';
 
 /** Visibility of a message; the client only ever receives public ones. */
 export type MessageVisibility = 'public' | 'internal';
@@ -50,17 +59,31 @@ export interface CaseMessage {
   id: string;
   body: string;
   author_type: MessageAuthorType;
+  author_name?: string | null;
   visibility: MessageVisibility;
   created_at: string;
 }
 
 /**
+ * Minimal event projection observed in l4-cos api/src/lib/work-items.js:
+ * getSupportCase reads `SELECT * FROM work_item_events ... ORDER BY created_at`.
+ * Status transitions are only safely renderable when carried in metadata.
+ */
+export interface CaseEvent {
+  id: string;
+  event_type: string;
+  metadata?: Record<string, unknown> | null;
+  created_at: string;
+}
+
+/**
  * Detail envelope from `GET /api/client/support/cases/:id`.
- * The raw backend envelope carries more keys; we narrow to these two.
+ * The raw backend envelope carries more keys; we narrow to rendered fields.
  */
 export interface CaseDetail {
   case: SupportCase;
   messages: CaseMessage[];
+  events?: CaseEvent[];
 }
 
 /** Request body for `POST /api/client/support/cases`. Only `subject` is required. */
