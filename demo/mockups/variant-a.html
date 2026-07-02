@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>L4 Support — Variant A · Operator Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --accent:#10b981; --accent-ink:#065f46; --accent-soft:#d1fae5;
+    --ink:#111827; --ink-2:#4b5563; --ink-3:#9ca3af;
+    --paper:#ffffff; --canvas:#f4f5f7; --line:#e5e7eb; --line-2:#d1d5db;
+    --amber:#b45309; --amber-soft:#fef3c7;
+    --blue:#1d4ed8; --blue-soft:#dbeafe;
+    --radius:10px;
+    font-size:15px;
+  }
+  *{box-sizing:border-box; margin:0}
+  body{
+    font-family:'IBM Plex Sans',sans-serif; color:var(--ink);
+    background:
+      radial-gradient(1200px 500px at 10% -10%, #e8f8f2 0%, transparent 60%),
+      var(--canvas);
+    min-height:100vh; padding:28px; display:flex; flex-direction:column; gap:14px;
+  }
+  .switch{display:flex; gap:10px; align-items:center; font-size:.82rem; color:var(--ink-2)}
+  .switch a{color:var(--blue); text-decoration:none; font-weight:600}
+  .switch .chip{margin-left:auto; display:flex; gap:6px}
+  .chip button{
+    font:inherit; font-size:.75rem; font-weight:600; padding:4px 10px; border-radius:999px;
+    border:1px solid var(--line-2); background:#fff; cursor:pointer; color:var(--ink-2);
+  }
+  .chip button.on{background:var(--accent); border-color:var(--accent); color:#fff}
+
+  /* ---------- widget panel ---------- */
+  .panel{
+    width:960px; max-width:100%; height:640px; margin:0 auto;
+    background:var(--paper); border:1px solid var(--line);
+    border-radius:16px; overflow:hidden; display:flex; flex-direction:column;
+    box-shadow:0 1px 2px rgb(17 24 39 / .04), 0 12px 40px -12px rgb(17 24 39 / .18);
+  }
+  header.bar{
+    display:flex; align-items:center; gap:12px; padding:14px 18px;
+    border-bottom:1px solid var(--line); background:#fff;
+  }
+  .mark{
+    width:28px; height:28px; border-radius:8px; display:grid; place-items:center;
+    background:linear-gradient(135deg, var(--accent), #0ea5a3);
+    color:#fff; font-weight:700; font-size:.8rem; letter-spacing:.02em;
+  }
+  .bar h1{font-size:.95rem; font-weight:600}
+  .bar .sub{font-size:.72rem; color:var(--ink-3); font-family:'IBM Plex Mono',monospace}
+  .bar .grow{flex:1}
+  .bar .status-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .bar .sla{font-size:.75rem; color:var(--ink-2)}
+  .bar .close{color:var(--ink-3); font-size:1rem; cursor:pointer; border:none; background:none}
+
+  main{flex:1; display:grid; grid-template-columns:340px 1fr; min-height:0}
+
+  /* ---------- left: ticket list ---------- */
+  .list{border-right:1px solid var(--line); display:flex; flex-direction:column; min-height:0; background:#fafbfc}
+  .tools{padding:12px; display:flex; gap:8px; border-bottom:1px solid var(--line)}
+  .search{
+    flex:1; display:flex; align-items:center; gap:8px; padding:7px 10px;
+    border:1px solid var(--line-2); border-radius:8px; background:#fff; color:var(--ink-3); font-size:.8rem;
+  }
+  .search kbd{margin-left:auto; font-family:'IBM Plex Mono',monospace; font-size:.65rem; border:1px solid var(--line-2); border-radius:4px; padding:1px 5px; color:var(--ink-3)}
+  .new{
+    font:inherit; font-size:.8rem; font-weight:600; padding:7px 12px; border-radius:8px; border:none;
+    background:var(--accent); color:#fff; cursor:pointer;
+  }
+  .new:hover{filter:brightness(.95)}
+  .filters{display:flex; gap:6px; padding:10px 12px 6px; font-size:.72rem}
+  .filters span{padding:3px 9px; border-radius:999px; color:var(--ink-2); cursor:pointer}
+  .filters .on{background:var(--ink); color:#fff; font-weight:600}
+  ul.tickets{list-style:none; padding:6px 8px; overflow:auto; flex:1}
+  .t{
+    padding:11px 10px; border-radius:8px; cursor:pointer; display:flex; flex-direction:column; gap:5px;
+    border:1px solid transparent;
+  }
+  .t:hover{background:#f1f3f5}
+  .t.sel{background:#fff; border-color:var(--line-2); box-shadow:0 1px 2px rgb(17 24 39/.05)}
+  .t .row{display:flex; align-items:center; gap:8px}
+  .t .id{font-family:'IBM Plex Mono',monospace; font-size:.68rem; color:var(--ink-3)}
+  .t .when{margin-left:auto; font-size:.68rem; color:var(--ink-3)}
+  .t .subj{font-size:.85rem; font-weight:600; line-height:1.3}
+  .t .prev{font-size:.75rem; color:var(--ink-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .pill{font-size:.66rem; font-weight:600; padding:2px 8px; border-radius:999px; letter-spacing:.01em}
+  .pill.wait{background:var(--amber-soft); color:var(--amber)}
+  .pill.prog{background:var(--blue-soft); color:var(--blue)}
+  .pill.done{background:var(--accent-soft); color:var(--accent-ink)}
+  .unread{width:7px;height:7px;border-radius:50%;background:var(--blue)}
+
+  /* ---------- right: thread ---------- */
+  .thread{display:flex; flex-direction:column; min-height:0}
+  .thead{padding:14px 20px 12px; border-bottom:1px solid var(--line); display:flex; align-items:flex-start; gap:12px}
+  .thead .subj{font-size:1rem; font-weight:700}
+  .meta{display:flex; gap:14px; margin-top:6px; font-size:.72rem; color:var(--ink-2); align-items:center}
+  .meta .id{font-family:'IBM Plex Mono',monospace; color:var(--ink-3)}
+  .stream{flex:1; overflow:auto; padding:18px 20px; display:flex; flex-direction:column; gap:14px; background:
+    linear-gradient(#fafbfc, #fff 120px)}
+  .msg{display:flex; gap:10px; max-width:78%}
+  .msg .av{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;font-size:.7rem;font-weight:700;flex:none}
+  .msg.you{align-self:flex-end; flex-direction:row-reverse}
+  .msg.you .av{background:#e5e7eb;color:var(--ink-2)}
+  .msg.agent .av{background:var(--accent-soft);color:var(--accent-ink)}
+  .bubble{border:1px solid var(--line); border-radius:12px; padding:10px 13px; font-size:.84rem; line-height:1.5; background:#fff}
+  .msg.you .bubble{background:var(--ink); color:#f9fafb; border-color:var(--ink)}
+  .who{font-size:.68rem; color:var(--ink-3); margin-bottom:4px; display:flex; gap:6px; align-items:center}
+  .who .vega{background:var(--accent-soft); color:var(--accent-ink); font-weight:700; font-size:.6rem; padding:1px 6px; border-radius:4px; letter-spacing:.04em}
+  .event{
+    align-self:center; display:flex; align-items:center; gap:8px;
+    font-size:.7rem; color:var(--ink-2); font-family:'IBM Plex Mono',monospace;
+  }
+  .event::before,.event::after{content:""; width:60px; height:1px; background:var(--line-2)}
+  .event .p{font-family:'IBM Plex Sans',sans-serif}
+  .articles{border:1px dashed var(--line-2); border-radius:10px; padding:10px 12px; font-size:.78rem; background:#fbfdfc}
+  .articles b{display:flex; gap:6px; align-items:center; font-size:.72rem; color:var(--accent-ink); margin-bottom:6px}
+  .articles a{display:block; color:var(--blue); text-decoration:none; padding:3px 0}
+  .articles a:hover{text-decoration:underline}
+
+  .composer{border-top:1px solid var(--line); padding:12px 20px 14px; display:flex; flex-direction:column; gap:8px}
+  .box{border:1px solid var(--line-2); border-radius:10px; padding:10px 12px; font-size:.84rem; color:var(--ink-3); background:#fff}
+  .box:focus-within{border-color:var(--accent)}
+  .actions{display:flex; align-items:center; gap:10px}
+  .hint{font-size:.7rem; color:var(--ink-3)}
+  .send{margin-left:auto; font:inherit; font-size:.8rem; font-weight:600; border:none; border-radius:8px; padding:8px 16px; background:var(--accent); color:#fff; cursor:pointer}
+  .resolve{font:inherit; font-size:.78rem; font-weight:600; border:1px solid var(--line-2); background:#fff; border-radius:8px; padding:7px 12px; color:var(--ink-2); cursor:pointer}
+  .resolve:hover{border-color:var(--accent); color:var(--accent-ink)}
+</style>
+</head>
+<body>
+  <div class="switch">
+    <strong>Variant A — “Operator Console”</strong>&nbsp;· light · dense · IBM Plex
+    <a href="./variant-b.html">view Variant B →</a>
+    <span class="chip">
+      accent:
+      <button class="on" onclick="setAccent('#10b981','#065f46','#d1fae5',this)">CivicKit</button>
+      <button onclick="setAccent('#8b5cf6','#5b21b6','#ede9fe',this)">AgencyHub</button>
+      <button onclick="setAccent('#0091ff','#1e40af','#dbeafe',this)">AgenFleet</button>
+    </span>
+  </div>
+
+  <section class="panel" aria-label="L4 Support">
+    <header class="bar">
+      <div class="mark">L4</div>
+      <div>
+        <h1>Support</h1>
+        <div class="sub">Gulf Coast Chamber · CivicKit</div>
+      </div>
+      <div class="grow"></div>
+      <span class="status-dot"></span>
+      <span class="sla">Typical first response · <b>under 15 min</b></span>
+      <button class="close" aria-label="Close">✕</button>
+    </header>
+
+    <main>
+      <aside class="list">
+        <div class="tools">
+          <div class="search">⌕ Search tickets &amp; answers <kbd>/</kbd></div>
+          <button class="new">+ New</button>
+        </div>
+        <div class="filters">
+          <span class="on">Open · 2</span><span>Waiting on you · 1</span><span>Resolved · 12</span>
+        </div>
+        <ul class="tickets">
+          <li class="t sel">
+            <div class="row"><span class="id">CASE-2026-01184</span><span class="when">2m</span></div>
+            <div class="subj">Member import fails on duplicate emails</div>
+            <div class="row"><span class="pill prog">In progress</span><span class="unread"></span>
+              <span class="prev">Vega: I’ve traced this to rows 41–43 of your CSV…</span></div>
+          </li>
+          <li class="t">
+            <div class="row"><span class="id">CASE-2026-01179</span><span class="when">3h</span></div>
+            <div class="subj">Board roster needs updating before annual meeting</div>
+            <div class="row"><span class="pill wait">Waiting on you</span>
+              <span class="prev">We need the final officer list to proceed —</span></div>
+          </li>
+          <li class="t">
+            <div class="row"><span class="id">CASE-2026-01158</span><span class="when">2d</span></div>
+            <div class="subj">When do Stripe payouts land after an event?</div>
+            <div class="row"><span class="pill done">Resolved</span>
+              <span class="prev">Answered instantly · article: “Payout timing”</span></div>
+          </li>
+        </ul>
+      </aside>
+
+      <section class="thread">
+        <div class="thead">
+          <div>
+            <div class="subj">Member import fails on duplicate emails</div>
+            <div class="meta">
+              <span class="id">CASE-2026-01184</span>
+              <span class="pill prog">In progress</span>
+              <span>Opened today, 9:41 AM</span>
+              <span>Category · Data</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="stream">
+          <div class="msg you">
+            <div class="av">CB</div>
+            <div>
+              <div class="who">You · 9:41 AM</div>
+              <div class="bubble">Trying to import our 2026 member list and it keeps failing partway. CSV attached — can someone take a look?</div>
+            </div>
+          </div>
+
+          <div class="event">9:41 AM <span class="p pill prog">Status → In progress</span> auto-triaged</div>
+
+          <div class="msg agent">
+            <div class="av">V</div>
+            <div>
+              <div class="who">L4 Support <span class="vega">VEGA · AI</span> · 9:42 AM</div>
+              <div class="bubble">
+                I traced the failure to <b>3 duplicate email addresses</b> (rows 41–43) — the importer stops to
+                protect your existing member records. You can fix this yourself in about a minute:
+                remove the duplicates or mark one row per member as primary, then re-upload.
+                <div class="articles" style="margin-top:9px">
+                  <b>⚡ Fix it now — no waiting</b>
+                  <a href="#">→ Resolving duplicate members during import</a>
+                  <a href="#">→ CSV template with required columns</a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="msg you">
+            <div class="av">CB</div>
+            <div>
+              <div class="who">You · 9:48 AM</div>
+              <div class="bubble">That worked for two of them, but row 43 is genuinely two different people sharing an office email. What do we do there?</div>
+            </div>
+          </div>
+
+          <div class="event">9:48 AM <span class="p">Vega escalated to a specialist · complex identity case</span></div>
+
+          <div class="msg agent">
+            <div class="av">JG</div>
+            <div>
+              <div class="who">Jesse · L4 Support · 9:52 AM</div>
+              <div class="bubble">Good catch — shared mailboxes are the one case the importer can’t decide for you. I’ve enabled <b>multi-member email</b> on your account; re-run the import and both records will keep the address with separate logins. I’ll watch the run from here.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="composer">
+          <div class="box">Reply — Vega answers instantly, a human steps in when it matters ↵</div>
+          <div class="actions">
+            <button class="resolve">✓ Mark resolved</button>
+            <span class="hint">Attachments · paste or drop</span>
+            <button class="send">Send</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </section>
+
+<script>
+function setAccent(a, ink, soft, btn){
+  const r=document.documentElement.style;
+  r.setProperty('--accent',a); r.setProperty('--accent-ink',ink); r.setProperty('--accent-soft',soft);
+  document.querySelectorAll('.chip button').forEach(b=>b.classList.remove('on')); btn.classList.add('on');
+  document.querySelector('.sub').textContent = btn.textContent==='CivicKit' ? 'Gulf Coast Chamber · CivicKit'
+    : btn.textContent==='AgencyHub' ? 'Meridian Creative · AgencyHub' : 'Fleet Ops · AgenFleet';
+}
+</script>
+</body>
+</html>
