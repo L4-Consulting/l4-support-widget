@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { ConfigContext, type NormalizedConfig } from '../src/config';
+import { TabStateContext } from '../src/tab-state';
 import { SupportTab } from '../src/tabs/SupportTab';
 
 const apiBase = 'https://api.example.test';
@@ -24,7 +25,9 @@ function renderSupport(configOverrides: Partial<NormalizedConfig> = {}) {
   };
   return render(
     <ConfigContext.Provider value={config}>
-      <SupportTab />
+      <TabStateContext.Provider value={{ activeTab: 'support', supportDraftSubject: '', openSupportWith: () => undefined }}>
+        <SupportTab />
+      </TabStateContext.Provider>
     </ConfigContext.Provider>,
   );
 }

@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState, type FormEvent, type JSX } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type JSX } from 'react';
 import { ApiClient, NotFoundError } from '../api/client';
 import type { CaseCategory, CaseDetail, CaseMessage, CaseSeverity, SupportCase } from '../api/types';
 import { emitEvent, useConfig } from '../config';
 import { strings } from '../strings';
+import { useTabState } from '../tab-state';
 
 const CATEGORIES: CaseCategory[] = [
   'how_to',
@@ -28,6 +29,12 @@ export function SupportTab(): JSX.Element {
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
   const [replyError, setReplyError] = useState('');
+  const { supportDraftSubject } = useTabState();
+  const [subject, setSubject] = useState(supportDraftSubject);
+
+  useEffect(() => {
+    setSubject(supportDraftSubject);
+  }, [supportDraftSubject]);
 
   useEffect(() => {
     let alive = true;
@@ -79,18 +86,18 @@ export function SupportTab(): JSX.Element {
     setFormError('');
     setFormSuccess('');
     const data = new FormData(form);
-    const subject = String(data.get('subject') ?? '').trim();
+    const nextSubject = String(data.get('subject') ?? '').trim();
     const description = String(data.get('description') ?? '').trim();
     const category = String(data.get('category') ?? 'other') as CaseCategory;
     const severity = String(data.get('severity') ?? 'normal') as CaseSeverity;
-    if (!subject) {
+    if (!nextSubject) {
       setFormError('Subject is required.');
       return;
     }
 
     try {
       const created = await api.createCase({
-        subject,
+        subject: nextSubject,
         description: description || undefined,
         category,
         severity,
@@ -100,6 +107,7 @@ export function SupportTab(): JSX.Element {
       setFormSuccess('Case submitted.');
       emitEvent(config, { type: 'support_case_created', caseId: created.id });
       form.reset();
+      setSubject('');
     } catch (error) {
       setFormError(error instanceof Error ? error.message : strings.genericError);
     }
@@ -130,7 +138,13 @@ export function SupportTab(): JSX.Element {
     <div className="grid gap-4 md:grid-cols-[17rem_1fr]" data-l4-support-tab>
       <form className="rounded-lg border border-slate-200 bg-white p-4" data-l4-support-form onSubmit={onSubmit}>
         <h3 className="text-sm font-semibold text-slate-900">{strings.submitTitle}</h3>
-        <Field label={strings.subjectLabel} name="subject" required />
+        <Field
+          label={strings.subjectLabel}
+          name="subject"
+          required
+          value={subject}
+          onChange={(event) => setSubject(event.target.value)}
+        />
         <Field label={strings.descriptionLabel} name="description" multiline />
         <Select label={strings.categoryLabel} name="category" values={CATEGORIES} defaultValue="other" />
         <Select label={strings.severityLabel} name="severity" values={SEVERITIES} defaultValue="normal" />
@@ -159,11 +173,15 @@ function Field({
   name,
   required,
   multiline,
+  value,
+  onChange,
 }: {
   label: string;
   name: string;
   required?: boolean;
   multiline?: boolean;
+  value?: string;
+  onChange?: (event: ChangeEvent<HTMLInputElement>) => void;
 }): JSX.Element {
   return (
     <label className="mt-3 block text-sm font-medium text-slate-700">
@@ -171,7 +189,13 @@ function Field({
       {multiline ? (
         <textarea className="mt-1 min-h-20 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" name={name} />
       ) : (
-        <input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" name={name} required={required} />
+        <input
+          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+          name={name}
+          required={required}
+          value={value}
+          onChange={onChange}
+        />
       )}
     </label>
   );

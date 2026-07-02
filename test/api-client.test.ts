@@ -56,6 +56,48 @@ describe('ApiClient', () => {
     expect(created.id).toBe('case-1');
   });
 
+  it('fetches docs search and roadmap responses', async () => {
+    server.use(
+      http.get(`${apiBase}/api/client/docs/search`, ({ request }) => {
+        expect(new URL(request.url).searchParams.get('q')).toBe('billing question');
+        return HttpResponse.json({
+          results: [
+            {
+              id: 'doc-1',
+              title: 'Billing help',
+              url: 'https://docs.example.test/billing',
+              source_type: 'bookstack',
+              relationship: 'direct',
+              match_score: 0.92,
+              suggestion_source: 'search',
+            },
+          ],
+        });
+      }),
+      http.get(`${apiBase}/api/client/roadmap`, () =>
+        HttpResponse.json({
+          items: [
+            {
+              id: 'road-1',
+              title: 'Better exports',
+              description: 'Add CSV exports.',
+              category: 'reporting',
+              status: 'planned',
+              priority: 'medium',
+              target_date: null,
+              quarter: 'Q3 2026',
+              phase: null,
+            },
+          ],
+        }),
+      ),
+    );
+
+    const client = new ApiClient(config());
+    await expect(client.searchDocs('billing question')).resolves.toMatchObject({ results: [{ id: 'doc-1' }] });
+    await expect(client.getRoadmap()).resolves.toMatchObject({ items: [{ id: 'road-1' }] });
+  });
+
   it('re-calls getToken once after a 401 and succeeds with the new token', async () => {
     const getToken = vi.fn().mockResolvedValueOnce('expired').mockResolvedValueOnce('fresh');
     const seen: string[] = [];

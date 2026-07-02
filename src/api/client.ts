@@ -3,7 +3,9 @@ import type {
   CaseMessage,
   CreateCaseBody,
   CreateMessageBody,
+  DocsSearchResponse,
   ListCasesResponse,
+  RoadmapResponse,
 } from './types';
 import { emitEvent, type NormalizedConfig, type WidgetEvent } from '../config';
 
@@ -87,6 +89,14 @@ export class ApiClient {
       method: 'POST',
       body,
     }).then((result) => result.message);
+  }
+
+  searchDocs(q: string): Promise<DocsSearchResponse> {
+    return this.#request<DocsSearchResponse>(`/api/client/docs/search?q=${encodeURIComponent(q)}`);
+  }
+
+  getRoadmap(): Promise<RoadmapResponse> {
+    return this.#request<RoadmapResponse>('/api/client/roadmap');
   }
 
   async #request<T>(

@@ -125,7 +125,7 @@ test('style isolation works in both directions across the shadow boundary', asyn
   expect(isolation.widgetButtonBorderColor).not.toBe('rgb(127, 29, 29)');
 });
 
-test('launcher opens and closes the panel, and only the support tab is visible', async ({ page }) => {
+test('launcher opens and closes the panel, and default tabs render with support selected', async ({ page }) => {
   await waitForWidget(page);
   await openPanel(page);
 
@@ -134,8 +134,9 @@ test('launcher opens and closes the panel, and only the support tab is visible',
     supportTabs: root.querySelectorAll('[data-l4-tab="support"]').length,
     helpTabs: root.querySelectorAll('[data-l4-tab="help"]').length,
     roadmapTabs: root.querySelectorAll('[data-l4-tab="roadmap"]').length,
+    selectedTab: root.querySelector('[aria-selected="true"]')?.getAttribute('data-l4-tab'),
   }));
-  expect(panel).toEqual({ hasPanel: true, supportTabs: 1, helpTabs: 0, roadmapTabs: 0 });
+  expect(panel).toEqual({ hasPanel: true, supportTabs: 1, helpTabs: 1, roadmapTabs: 1, selectedTab: 'support' });
 
   await shadowEval(page, (root) => root.querySelector<HTMLElement>('[data-l4-close-panel]')?.click());
   await expect.poll(() => shadowEval(page, (root) => Boolean(root.querySelector('[data-l4-panel]')))).toBe(false);

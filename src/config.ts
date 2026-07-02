@@ -11,7 +11,7 @@ export interface L4SupportInit {
   apiBase: string;
   /** Host supplies the caller's JWT. */
   getToken?: TokenProvider;
-  /** Which tabs to enable. Default: support only until Help/Roadmap content exists. */
+  /** Which tabs to enable. Default: Help / My Support / Roadmap, with Support selected first. */
   tabs?: Array<'help' | 'support' | 'roadmap'>;
   theme?: { accent?: string; mode?: 'light' | 'dark' | 'auto' };
   launcher?: { enabled?: boolean; position?: 'br' | 'bl' };
@@ -49,7 +49,7 @@ export class ConfigError extends Error {
   }
 }
 
-const DEFAULT_TABS: SupportTabId[] = ['support'];
+const DEFAULT_TABS: SupportTabId[] = ['help', 'support', 'roadmap'];
 const ALL_TABS = new Set<SupportTabId>(['help', 'support', 'roadmap']);
 const DEFAULT_ACCENT = '#2563eb';
 
