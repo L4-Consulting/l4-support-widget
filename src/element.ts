@@ -89,10 +89,11 @@ export class L4SupportElement extends HTMLElement {
 
   #configFromAttributes(): L4SupportInit | null {
     const productKey = this.getAttribute('product-key');
+    const productLabel = this.getAttribute('product-label') || undefined;
     const apiBase = this.getAttribute('api-base');
     const getToken = getStoredTokenProvider() ?? undefined;
     if (!productKey || !apiBase || !getToken) return null;
-    return { productKey, apiBase, getToken };
+    return { productKey, productLabel, apiBase, getToken };
   }
 }
 

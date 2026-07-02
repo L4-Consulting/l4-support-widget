@@ -7,6 +7,8 @@ export type TokenProvider = () => string | null | Promise<string | null>;
 export interface L4SupportInit {
   /** Sent as `X-Product-Key`. */
   productKey: string;
+  /** Human-readable product label shown in the widget header. Defaults to productKey. */
+  productLabel?: string;
   /** API origin, e.g. "https://api.l4consulting.net". */
   apiBase: string;
   /** Host supplies the caller's JWT. */
@@ -28,6 +30,7 @@ export interface WidgetEvent {
 
 export interface NormalizedConfig {
   productKey: string;
+  productLabel: string;
   apiBase: string;
   getToken: TokenProvider;
   tabs: SupportTabId[];
@@ -51,7 +54,7 @@ export class ConfigError extends Error {
 
 const DEFAULT_TABS: SupportTabId[] = ['help', 'support', 'roadmap'];
 const ALL_TABS = new Set<SupportTabId>(['help', 'support', 'roadmap']);
-const DEFAULT_ACCENT = '#2563eb';
+const DEFAULT_ACCENT = '#10b981';
 
 function requireString(value: unknown, name: string): string {
   if (typeof value !== 'string' || value.trim().length === 0) {
@@ -78,6 +81,7 @@ function normalizeTabs(tabs: L4SupportInit['tabs']): SupportTabId[] {
 
 export function normalizeConfig(opts: L4SupportInit, fallbackTokenProvider?: TokenProvider | null): NormalizedConfig {
   const productKey = requireString(opts.productKey, 'productKey');
+  const productLabel = typeof opts.productLabel === 'string' && opts.productLabel.trim() ? opts.productLabel.trim() : productKey;
   const apiBase = normalizeApiBase(requireString(opts.apiBase, 'apiBase'));
   const getToken = opts.getToken ?? fallbackTokenProvider;
 
@@ -91,6 +95,7 @@ export function normalizeConfig(opts: L4SupportInit, fallbackTokenProvider?: Tok
 
   return {
     productKey,
+    productLabel,
     apiBase,
     getToken,
     tabs: normalizeTabs(opts.tabs),
