@@ -36,19 +36,19 @@ export function RoadmapTab(): JSX.Element {
   if (items.length === 0) return <StateMessage tone="empty">{strings.noRoadmap}</StateMessage>;
 
   return (
-    <section className="space-y-4" data-l4-roadmap-tab>
+    <section className="l4-roadmap" data-l4-roadmap-tab>
       {groupRoadmapItems(items).map((group) => (
-        <section key={group.heading} className="rounded-lg border border-slate-200 bg-white" data-l4-card>
-          <div className="border-b border-slate-200 px-4 py-3">
-            <h3 className="text-sm font-semibold text-slate-900">{group.heading}</h3>
+        <section key={group.heading} className="l4-roadmap-card" data-l4-card>
+          <div className="l4-roadmap-head">
+            <h3>{group.heading}</h3>
           </div>
-          <ul className="divide-y divide-slate-200">
+          <ul className="l4-roadmap-list">
             {group.items.map((item) => (
-              <li key={item.id} className="p-4">
-                <h4 className="text-sm font-semibold text-slate-900">{item.title}</h4>
-                <p className="mt-1 text-sm text-slate-700">{item.description}</p>
+              <li key={item.id}>
+                <h4>{item.title}</h4>
+                <p>{item.description}</p>
                 {item.target_date || item.quarter ? (
-                  <p className="mt-2 text-xs text-slate-600">{[item.target_date, item.quarter].filter(Boolean).join(' · ')}</p>
+                  <p className="l4-roadmap-meta">{[item.target_date, item.quarter].filter(Boolean).join(' · ')}</p>
                 ) : null}
               </li>
             ))}
@@ -62,7 +62,7 @@ export function RoadmapTab(): JSX.Element {
 function StateMessage({ children, tone }: { children: string; tone: 'empty' | 'loading' | 'error' }): JSX.Element {
   return (
     <p
-      className={`rounded-lg border border-slate-200 bg-white p-4 text-sm ${tone === 'error' ? 'text-red-700' : 'text-slate-600'}`}
+      className="l4-roadmap-state"
       role={tone === 'error' ? 'alert' : 'status'}
       aria-live="polite"
       data-l4-card

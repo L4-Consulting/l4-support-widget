@@ -59,6 +59,7 @@ export interface CaseMessage {
   id: string;
   body: string;
   author_type: MessageAuthorType;
+  author_name?: string | null;
   visibility: MessageVisibility;
   created_at: string;
 }

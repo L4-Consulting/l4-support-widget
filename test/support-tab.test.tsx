@@ -90,6 +90,7 @@ describe('SupportTab', () => {
   });
 
   it('filters cases, maps statuses, and renders safe status events', async () => {
+    let docsCalls = 0;
     server.use(
       http.get(`${apiBase}/api/client/support/cases`, () =>
         HttpResponse.json({
@@ -106,12 +107,12 @@ describe('SupportTab', () => {
           messages: [
             message('msg-client', 'Import keeps failing', 'client'),
             message('msg-agent', 'I found duplicate emails', 'agent'),
-            message('msg-human', 'I enabled multi-member email', 'human'),
+            message('msg-human', 'I enabled multi-member email', 'human', 'Jordan Lee'),
           ],
           events: [
             {
               id: 'evt-1',
-              event_type: 'case_updated',
+              event_type: 'agent_triage_completed',
               summary: 'Case updated',
               metadata: { next_status: 'triaging' },
               created_at: '2026-07-01T00:01:00.000Z',
@@ -123,10 +124,33 @@ describe('SupportTab', () => {
               metadata: { category: 'data' },
               created_at: '2026-07-01T00:02:00.000Z',
             },
+            {
+              id: 'evt-assign',
+              event_type: 'case_assigned',
+              summary: 'Assigned',
+              metadata: { assignee_name: 'Jordan Lee' },
+              created_at: '2026-07-01T00:03:00.000Z',
+            },
           ],
         }),
       ),
-      http.get(`${apiBase}/api/client/docs/search`, () => HttpResponse.json({ results: [] })),
+      http.get(`${apiBase}/api/client/docs/search`, ({ request }) => {
+        docsCalls += 1;
+        expect(new URL(request.url).searchParams.get('q')).toBe('CSV');
+        return HttpResponse.json({
+          results: [
+            {
+              id: 'doc-1',
+              title: 'Resolving duplicate members during import',
+              url: 'https://docs.example.test/imports/duplicates',
+              source_type: 'article',
+              relationship: 'direct',
+              match_score: 0.93,
+              suggestion_source: 'search',
+            },
+          ],
+        });
+      }),
     );
 
     renderSupport();
@@ -141,14 +165,20 @@ describe('SupportTab', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open · 1' }));
     fireEvent.change(screen.getByLabelText('Search tickets & answers'), { target: { value: 'CSV' } });
+    expect(await screen.findByText('Resolving duplicate members during import')).not.toBeNull();
+    const answerLink = screen.getByRole('link', { name: 'Resolving duplicate members during import' });
+    expect(answerLink.getAttribute('rel')).toBe('noopener noreferrer');
+    expect(docsCalls).toBe(1);
     expect(within(list as HTMLElement).getByText('Import failure')).not.toBeNull();
     expect(within(list as HTMLElement).queryByText('Roster update')).toBeNull();
     fireEvent.click(screen.getAllByText('Import failure')[0]);
 
     expect(await screen.findByText('I found duplicate emails')).not.toBeNull();
     expect(screen.getByText('VEGA · AI')).not.toBeNull();
-    expect(screen.getAllByText('L4 Support').length).toBeGreaterThan(0);
+    expect(screen.getByText('Jordan Lee')).not.toBeNull();
     expect(screen.getByText('Status ->')).not.toBeNull();
+    expect(screen.getByText('auto-triaged')).not.toBeNull();
+    expect(screen.getByText('Escalated to a specialist')).not.toBeNull();
     expect(screen.queryByText('No status')).toBeNull();
   });
 
@@ -194,11 +224,12 @@ function supportCase(
   };
 }
 
-function message(id: string, body: string, authorType = 'client') {
+function message(id: string, body: string, authorType = 'client', authorName?: string) {
   return {
     id,
     body,
     author_type: authorType,
+    author_name: authorName,
     visibility: 'public',
     created_at: '2026-07-01T00:00:00.000Z',
   };

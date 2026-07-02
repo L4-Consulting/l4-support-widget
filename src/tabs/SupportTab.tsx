@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type JSX } from 'react';
 import { ApiClient, NotEnabledError, NotFoundError, RateLimitedError, ServerError, SessionExpiredError, ValidationError } from '../api/client';
-import type { CaseCategory, CaseDetail, CaseEvent, CaseMessage, CaseSeverity, SupportCase } from '../api/types';
+import type { CaseCategory, CaseDetail, CaseEvent, CaseMessage, CaseSeverity, SupportCase, DocResult } from '../api/types';
 import { emitEvent, useConfig } from '../config';
 import { strings } from '../strings';
 import { useTabState } from '../tab-state';
@@ -8,6 +8,8 @@ import { supportStatusView, type SupportStatusGroup } from './support-status';
 
 const CATEGORIES: CaseCategory[] = ['how_to', 'bug', 'billing', 'refund', 'access', 'feature_request', 'implementation', 'data', 'other'];
 const SEVERITIES: CaseSeverity[] = ['low', 'normal', 'high'];
+const MIN_SEARCH_LENGTH = 3;
+const SEARCH_DEBOUNCE_MS = 300;
 const FILTERS: Array<{ group: SupportStatusGroup; label: string }> = [
   { group: 'open', label: strings.supportFilterOpen },
   { group: 'waiting', label: strings.supportFilterWaiting },
@@ -27,6 +29,7 @@ export function SupportTab(): JSX.Element {
   const [rightPaneMode, setRightPaneMode] = useState<RightPaneMode>('detail');
   const [activeFilter, setActiveFilter] = useState<SupportStatusGroup>('open');
   const [query, setQuery] = useState('');
+  const [answers, setAnswers] = useState<DocResult[]>([]);
   const [detail, setDetail] = useState<CaseDetail | null>(null);
   const [detailState, setDetailState] = useState<DetailState>('idle');
   const [formError, setFormError] = useState('');
@@ -89,6 +92,30 @@ export function SupportTab(): JSX.Element {
   }, [api, rightPaneMode, selectedId]);
 
   const trimmedQuery = query.trim();
+
+  useEffect(() => {
+    if (trimmedQuery.length < MIN_SEARCH_LENGTH) {
+      setAnswers([]);
+      return;
+    }
+
+    let alive = true;
+    const timeoutId = window.setTimeout(() => {
+      api
+        .searchDocs(trimmedQuery)
+        .then(({ results }) => {
+          if (alive) setAnswers(results);
+        })
+        .catch(() => {
+          if (alive) setAnswers([]);
+        });
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      alive = false;
+      window.clearTimeout(timeoutId);
+    };
+  }, [api, trimmedQuery]);
 
   const filteredCases = useMemo(() => {
     const normalizedQuery = trimmedQuery.toLowerCase();
@@ -217,6 +244,8 @@ export function SupportTab(): JSX.Element {
             </button>
           ))}
         </div>
+        <SearchAnswers results={answers} show={trimmedQuery.length >= MIN_SEARCH_LENGTH} />
+        <div className="l4-list-heading">{strings.supportTicketsTitle}</div>
         <CasesList cases={filteredCases} state={listState} selectedId={selectedId} onSelect={selectCase} />
       </aside>
 
@@ -322,6 +351,25 @@ function Select({
         ))}
       </select>
     </label>
+  );
+}
+
+function SearchAnswers({ results, show }: { results: DocResult[]; show: boolean }): JSX.Element | null {
+  if (!show || results.length === 0) return null;
+
+  return (
+    <section className="l4-answers-group" aria-label={strings.supportAnswersTitle}>
+      <h3>{strings.supportAnswersTitle}</h3>
+      <ul>
+        {results.slice(0, 3).map((result) => (
+          <li key={result.id}>
+            <a href={result.url} target="_blank" rel="noopener noreferrer">
+              {result.title}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -449,7 +497,7 @@ function EmptyThread(): JSX.Element {
 function MessageItem({ message }: { message: CaseMessage }): JSX.Element {
   const isCustomer = message.author_type === 'client' || message.author_type === 'customer';
   const isAi = message.author_type === 'agent';
-  const authorName = isCustomer ? strings.supportYouAuthor : strings.supportAgentAuthor;
+  const authorName = isCustomer ? strings.supportYouAuthor : message.author_name || strings.supportAgentAuthor;
   return (
     <li className="l4-message" data-author={isCustomer ? 'customer' : 'l4'}>
       <div className="l4-avatar">{isCustomer ? initials(authorName) : l4Initials(message)}</div>
@@ -474,15 +522,21 @@ function MessageItem({ message }: { message: CaseMessage }): JSX.Element {
 function EventItem({ event }: { event: CaseEvent }): JSX.Element | null {
   const metadata = event.metadata && typeof event.metadata === 'object' ? event.metadata : null;
   const nextStatus = eventNextStatus(event, metadata);
-  if (!nextStatus) return null;
+  const label = eventLabel(event, nextStatus);
+  if (!label) return null;
 
   return (
     <li className="l4-event">
       <span>{formatTime(event.created_at)}</span>
-      <span className="l4-event-pill">
-        <span>{strings.supportStatusTransition}</span>
-        <StatusPill status={nextStatus} />
-      </span>
+      {nextStatus ? (
+        <span className="l4-event-pill">
+          <span>{strings.supportStatusTransition}</span>
+          <StatusPill status={nextStatus} />
+          <span>{eventReason(event, metadata)}</span>
+        </span>
+      ) : (
+        <span className="l4-event-pill">{label}</span>
+      )}
     </li>
   );
 }
@@ -511,11 +565,23 @@ function timelineItems(detail: CaseDetail): TimelineItem[] {
 function isRenderableEvent(event: CaseEvent): boolean {
   if (!event || typeof event.id !== 'string' || typeof event.created_at !== 'string') return false;
   const metadata = event.metadata && typeof event.metadata === 'object' ? event.metadata : null;
-  return Boolean(eventNextStatus(event, metadata));
+  return Boolean(eventLabel(event, eventNextStatus(event, metadata)));
 }
 
 function eventNextStatus(event: CaseEvent, metadata: Record<string, unknown> | null): string | null {
   return readString(metadata, 'next_status') ?? (event.event_type === 'case_updated' ? readString(metadata, 'status') : null);
+}
+
+function eventLabel(event: CaseEvent, nextStatus: string | null): string | null {
+  if (nextStatus) return strings.supportStatusTransition;
+  if (event.event_type === 'case_assigned') return strings.supportEventCaseAssigned;
+  return null;
+}
+
+function eventReason(event: CaseEvent, metadata: Record<string, unknown> | null): string {
+  const reason = readString(metadata, 'reason');
+  if (reason) return reason;
+  return event.event_type === 'agent_triage_completed' ? strings.supportAutoTriaged : strings.supportEventUpdated;
 }
 
 function readString(source: Record<string, unknown> | null, key: string): string | null {
@@ -558,7 +624,8 @@ function initials(value: string): string {
 }
 
 function l4Initials(message: CaseMessage): string {
-  return message.author_type === 'agent' ? strings.supportVegaBadge.slice(0, 2) : initials(strings.supportAgentAuthor);
+  if (message.author_type === 'agent') return 'V';
+  return initials(message.author_name || strings.supportAgentAuthor);
 }
 
 function StateMessage({ children, tone }: { children: string; tone: 'empty' | 'loading' | 'error' }): JSX.Element {
