@@ -2,10 +2,12 @@
   "name": "@l4/support-widget",
   "version": "0.1.0",
   "description": "L4 Consulting shared embeddable support widget (Help / My Support / Roadmap).",
-  "private": true,
   "type": "module",
   "license": "UNLICENSED",
   "sideEffects": false,
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "files": [
     "dist"
   ],
@@ -21,8 +23,10 @@
   },
   "scripts": {
     "dev": "vite",
+    "prepack": "npm run build:only",
     "build": "tsc --noEmit && npm run build:only",
-    "build:only": "vite build --mode global && vite build --mode esm",
+    "build:only": "vite build --mode global && vite build --mode esm && npm run build:types",
+    "build:types": "tsc -p tsconfig.types.json",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
