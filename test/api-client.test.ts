@@ -160,6 +160,44 @@ describe('ApiClient', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
+  it('submits CSAT via POST /support/cases/:id/csat and returns the csat envelope', async () => {
+    let posted: unknown = null;
+    server.use(
+      http.post(`${apiBase}/api/client/support/cases/case-1/csat`, async ({ request }) => {
+        posted = await request.json();
+        expect(request.headers.get('authorization')).toBe('Bearer tok-1');
+        expect(request.headers.get('x-product-key')).toBe('civickit');
+        return HttpResponse.json(
+          {
+            csat: {
+              rating: 5,
+              comment: 'Great',
+              submitted_at: '2026-07-03T12:00:00.000Z',
+            },
+          },
+          { status: 201 },
+        );
+      }),
+    );
+
+    const csat = await new ApiClient(config()).submitCsat('case-1', { rating: 5, comment: 'Great' });
+    expect(csat).toEqual({ rating: 5, comment: 'Great', submitted_at: '2026-07-03T12:00:00.000Z' });
+    expect(posted).toEqual({ rating: 5, comment: 'Great' });
+  });
+
+  it('omits the comment field when the body has no comment', async () => {
+    let posted: unknown = null;
+    server.use(
+      http.post(`${apiBase}/api/client/support/cases/case-1/csat`, async ({ request }) => {
+        posted = await request.json();
+        return HttpResponse.json({ csat: { rating: 4, submitted_at: '2026-07-03T12:00:00.000Z' } }, { status: 201 });
+      }),
+    );
+
+    await new ApiClient(config()).submitCsat('case-1', { rating: 4 });
+    expect(posted).toEqual({ rating: 4 });
+  });
+
   it('emits rate_limited and server_error telemetry for typed API failures', async () => {
     const onEvent = vi.fn();
     server.use(
