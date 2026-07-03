@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type JSX } from 'react';
 import { ApiClient, NotEnabledError, NotFoundError, RateLimitedError, ServerError, SessionExpiredError, ValidationError } from '../api/client';
-import type { CaseCategory, CaseDetail, CaseEvent, CaseMessage, CaseSeverity, SupportCase, DocResult } from '../api/types';
+import type { CaseCategory, CaseCsat, CaseDetail, CaseEvent, CaseMessage, CaseSeverity, SupportCase, DocResult } from '../api/types';
 import { emitEvent, useConfig } from '../config';
 import { strings } from '../strings';
 import { useTabState } from '../tab-state';
+import { CsatPanel } from './CsatPanel';
 import { supportStatusView, type SupportStatusGroup } from './support-status';
 
 const CATEGORIES: CaseCategory[] = ['how_to', 'bug', 'billing', 'refund', 'access', 'feature_request', 'implementation', 'data', 'other'];
@@ -213,6 +214,10 @@ export function SupportTab(): JSX.Element {
     }
   }
 
+  function onCsatSubmitted(csat: CaseCsat) {
+    setDetail((current) => (current ? { ...current, csat } : current));
+  }
+
   const mobileView = rightPaneMode === 'new' || selectedId ? 'detail' : 'list';
 
   return (
@@ -256,7 +261,14 @@ export function SupportTab(): JSX.Element {
         {rightPaneMode === 'new' ? (
           <CreateCasePanel subject={subject} setSubject={setSubject} formError={formError} onSubmit={onSubmit} />
         ) : (
-          <CaseDetailPanel state={detailState} detail={detail} onReply={onReply} replyError={replyError} />
+          <CaseDetailPanel
+            state={detailState}
+            detail={detail}
+            api={api}
+            onReply={onReply}
+            replyError={replyError}
+            onCsatSubmitted={onCsatSubmitted}
+          />
         )}
       </section>
     </div>
@@ -430,18 +442,25 @@ function TicketRow({
 function CaseDetailPanel({
   state,
   detail,
+  api,
   onReply,
   replyError,
+  onCsatSubmitted,
 }: {
   state: DetailState;
   detail: CaseDetail | null;
+  api: ApiClient;
   onReply: (event: FormEvent<HTMLFormElement>) => void;
   replyError: string;
+  onCsatSubmitted: (csat: CaseCsat) => void;
 }): JSX.Element {
   if (state === 'idle') return <EmptyThread />;
   if (state === 'loading') return <StateMessage tone="loading">{strings.caseLoading}</StateMessage>;
   if (state === 'missing') return <StateMessage tone="empty">{strings.caseUnavailable}</StateMessage>;
   if (state === 'error' || !detail) return <StateMessage tone="error">{strings.caseError}</StateMessage>;
+
+  const statusGroup = supportStatusView(detail.case.status).group;
+  const showCsat = statusGroup === 'resolved';
 
   return (
     <article className="l4-thread" data-l4-case-detail>
@@ -469,6 +488,14 @@ function CaseDetailPanel({
           ),
         )}
       </ol>
+      {showCsat ? (
+        <CsatPanel
+          api={api}
+          caseId={detail.case.id}
+          initialCsat={detail.csat ?? null}
+          onSubmitted={onCsatSubmitted}
+        />
+      ) : null}
       <form className="l4-composer" onSubmit={onReply}>
         <label className="l4-reply-label">
           <span>{strings.replyLabel}</span>
