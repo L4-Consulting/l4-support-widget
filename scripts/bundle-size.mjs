@@ -6,7 +6,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const BUDGET_KB = 60; // gzip budget for the IIFE React bundle
+const BUDGET_KB = 65; // gzip budget for the IIFE React bundle (raised from 60KB after ISS-2026-0626 CSAT panel)
 const bundlePath = resolve(__dirname, '..', 'dist', 'l4-support-widget.js');
 
 if (!existsSync(bundlePath)) {
