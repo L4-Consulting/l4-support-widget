@@ -820,14 +820,76 @@
   }
 
   .l4-doc-link {
+    appearance: none;
+    border: 0;
+    background: transparent;
     color: var(--l4-accent);
     font-size: .86rem;
     font-weight: 600;
+    font-family: inherit;
+    padding: 0;
+    text-align: left;
     text-decoration: none;
+    cursor: pointer;
   }
 
   .l4-doc-link:hover {
     text-decoration: underline;
+  }
+
+  .l4-doc-summary {
+    margin-top: 4px;
+    color: var(--l4-ink-2);
+    font-size: .78rem;
+    line-height: 1.45;
+  }
+
+  .l4-help-back {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: var(--l4-accent);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: .78rem;
+    font-weight: 700;
+    padding: 0;
+  }
+
+  .l4-help-article {
+    display: grid;
+    gap: 10px;
+  }
+
+  .l4-help-article h2 {
+    color: var(--l4-ink);
+    font-size: 1rem;
+    font-weight: 800;
+    line-height: 1.25;
+  }
+
+  .l4-help-article-summary,
+  .l4-help-markdown p,
+  .l4-help-markdown li {
+    color: var(--l4-ink-2);
+    font-size: .82rem;
+    line-height: 1.5;
+  }
+
+  .l4-help-markdown {
+    display: grid;
+    gap: 9px;
+  }
+
+  .l4-help-markdown h3 {
+    color: var(--l4-ink);
+    font-size: .9rem;
+    font-weight: 800;
+    line-height: 1.25;
+  }
+
+  .l4-help-markdown ul {
+    margin-left: 18px;
   }
 
   .l4-roadmap {

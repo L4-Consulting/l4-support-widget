@@ -66,9 +66,10 @@ describe('ApiClient', () => {
           results: [
             {
               id: 'doc-1',
+              slug: 'billing-help',
               title: 'Billing help',
-              url: 'https://docs.example.test/billing',
-              source_type: 'bookstack',
+              url: '/api/client/docs/articles/billing-help',
+              source_type: 'article',
               relationship: 'direct',
               match_score: 0.92,
               suggestion_source: 'search',
@@ -76,6 +77,21 @@ describe('ApiClient', () => {
           ],
         });
       }),
+      http.get(`${apiBase}/api/client/docs/articles/billing-help`, () =>
+        HttpResponse.json({
+          article: {
+            id: 'doc-1',
+            slug: 'billing-help',
+            title: 'Billing help',
+            url: '/api/client/docs/articles/billing-help',
+            source_type: 'article',
+            relationship: 'direct',
+            match_score: 0.92,
+            suggestion_source: 'search',
+            body_markdown: '# Billing help\n\nOpen Payments.',
+          },
+        }),
+      ),
       http.get(`${apiBase}/api/client/roadmap`, () =>
         HttpResponse.json({
           items: [
@@ -97,6 +113,7 @@ describe('ApiClient', () => {
 
     const client = new ApiClient(config());
     await expect(client.searchDocs('billing question')).resolves.toMatchObject({ results: [{ id: 'doc-1' }] });
+    await expect(client.getDocArticle('billing-help')).resolves.toMatchObject({ article: { slug: 'billing-help' } });
     await expect(client.getRoadmap()).resolves.toMatchObject({ items: [{ id: 'road-1' }] });
   });
 

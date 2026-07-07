@@ -70,7 +70,7 @@ describe('HelpTab', () => {
     expect(screen.getByText('Type at least 3 characters to search.')).not.toBeNull();
   });
 
-  it('debounces docs search and renders title links without snippets', async () => {
+  it('debounces docs search and renders articles inside the widget', async () => {
     let requests = 0;
     server.use(
       http.get(`${apiBase}/api/client/docs/search`, ({ request }) => {
@@ -80,9 +80,11 @@ describe('HelpTab', () => {
           results: [
             {
               id: 'doc-1',
+              slug: 'billing-guide',
               title: 'Billing guide',
-              url: 'https://docs.example.test/billing',
-              source_type: 'bookstack',
+              url: '/api/client/docs/articles/billing-guide',
+              summary: 'Read this before filing a billing case.',
+              source_type: 'article',
               relationship: 'direct',
               match_score: 0.98,
               suggestion_source: 'search',
@@ -90,6 +92,22 @@ describe('HelpTab', () => {
           ],
         });
       }),
+      http.get(`${apiBase}/api/client/docs/articles/billing-guide`, () =>
+        HttpResponse.json({
+          article: {
+            id: 'doc-1',
+            slug: 'billing-guide',
+            title: 'Billing guide',
+            url: '/api/client/docs/articles/billing-guide',
+            summary: 'Read this before filing a billing case.',
+            source_type: 'article',
+            relationship: 'direct',
+            match_score: 0.98,
+            suggestion_source: 'search',
+            body_markdown: '# Billing guide\n\nOpen Payments to review dues.',
+          },
+        }),
+      ),
     );
 
     renderHelp();
@@ -100,12 +118,11 @@ describe('HelpTab', () => {
     expect(requests).toBe(0);
     await waitForDebounce();
 
-    const link = await screen.findByRole('link', { name: 'Billing guide' });
+    const button = await screen.findByRole('button', { name: 'Billing guide' });
     expect(requests).toBe(1);
-    expect(link.getAttribute('href')).toBe('https://docs.example.test/billing');
-    expect(link.getAttribute('target')).toBe('_blank');
-    expect(link.getAttribute('rel')).toBe('noopener noreferrer');
-    expect(screen.queryByText(/snippet|excerpt/i)).toBeNull();
+    fireEvent.click(button);
+    expect(await screen.findByText('Open Payments to review dues.')).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Back to results' })).not.toBeNull();
   });
 
   it('renders the honest empty state', async () => {
