@@ -138,12 +138,19 @@ export interface RoadmapItem {
  */
 export interface DocResult {
   id: string;
+  slug?: string;
   title: string;
   url: string;
+  summary?: string | null;
   source_type: string;
   relationship: string;
   match_score: number;
   suggestion_source: string;
+}
+
+export interface DocArticle extends DocResult {
+  slug: string;
+  body_markdown: string;
 }
 
 /** List responses from the backend (no pagination yet — noted for scale). */
@@ -157,4 +164,8 @@ export interface RoadmapResponse {
 
 export interface DocsSearchResponse {
   results: DocResult[];
+}
+
+export interface DocArticleResponse {
+  article: DocArticle;
 }
