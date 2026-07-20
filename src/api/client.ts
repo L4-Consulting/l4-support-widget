@@ -4,6 +4,7 @@ import type {
   CaseMessage,
   CreateCaseBody,
   CreateMessageBody,
+  DocArticleResponse,
   DocsSearchResponse,
   ListCasesResponse,
   RoadmapResponse,
@@ -110,6 +111,10 @@ export class ApiClient {
 
   searchDocs(q: string): Promise<DocsSearchResponse> {
     return this.#request<DocsSearchResponse>(`/api/client/docs/search?q=${encodeURIComponent(q)}`);
+  }
+
+  getDocArticle(slug: string): Promise<DocArticleResponse> {
+    return this.#request<DocArticleResponse>(`/api/client/docs/articles/${encodeURIComponent(slug)}`);
   }
 
   getRoadmap(): Promise<RoadmapResponse> {
