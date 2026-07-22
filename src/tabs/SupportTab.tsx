@@ -10,6 +10,7 @@ const CATEGORIES: CaseCategory[] = ['how_to', 'bug', 'billing', 'refund', 'acces
 const SEVERITIES: CaseSeverity[] = ['low', 'normal', 'high'];
 const MIN_SEARCH_LENGTH = 3;
 const SEARCH_DEBOUNCE_MS = 300;
+const DETAIL_POLL_MS = 20_000;
 const FILTERS: Array<{ group: SupportStatusGroup; label: string }> = [
   { group: 'open', label: strings.supportFilterOpen },
   { group: 'waiting', label: strings.supportFilterWaiting },
@@ -78,21 +79,48 @@ export function SupportTab(): JSX.Element {
       return;
     }
     let alive = true;
+    let polling = false;
+    let intervalId: number | undefined;
     setDetailState('loading');
-    api
-      .getCase(selectedId)
+    const fetchDetail = (silent = false) => {
+      if (silent && polling) return;
+      if (silent) polling = true;
+      api.getCase(selectedId)
       .then((nextDetail) => {
         if (!alive) return;
         setDetail(nextDetail);
         setDetailState('ready');
       })
       .catch((error: unknown) => {
-        if (!alive) return;
+        if (!alive || silent) return;
         setDetail(null);
         setDetailState(error instanceof NotFoundError ? 'missing' : 'error');
+      })
+      .finally(() => {
+        polling = false;
       });
+    };
+    const stopPolling = () => {
+      if (intervalId !== undefined) window.clearInterval(intervalId);
+      intervalId = undefined;
+    };
+    const startPolling = () => {
+      stopPolling();
+      if (document.visibilityState !== 'visible') return;
+      intervalId = window.setInterval(() => fetchDetail(true), DETAIL_POLL_MS);
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') startPolling();
+      else stopPolling();
+    };
+
+    fetchDetail();
+    startPolling();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       alive = false;
+      stopPolling();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [api, rightPaneMode, selectedId]);
 

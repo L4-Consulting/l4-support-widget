@@ -1,5 +1,5 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { ConfigContext, type NormalizedConfig } from '../src/config';
@@ -10,7 +10,11 @@ const apiBase = 'https://api.example.test';
 const server = setupServer();
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+  server.resetHandlers();
+});
 afterAll(() => server.close());
 
 function renderSupport(configOverrides: Partial<NormalizedConfig> = {}) {
@@ -218,6 +222,48 @@ describe('SupportTab', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Back' }));
 
     await waitFor(() => expect(consoleElement?.getAttribute('data-l4-mobile-view')).toBe('list'));
+  });
+
+  it('silently polls a visible selected case and pauses while hidden', async () => {
+    let detailCalls = 0;
+    server.use(
+      http.get(`${apiBase}/api/client/support/cases`, () => HttpResponse.json({ cases: [supportCase('case-1')] })),
+      http.get(`${apiBase}/api/client/support/cases/case-1`, () => {
+        detailCalls += 1;
+        return HttpResponse.json({
+          case: supportCase('case-1'),
+          messages: [
+            message('msg-1', 'Initial message'),
+            ...(detailCalls > 1 ? [message('msg-2', 'New Vega reply', 'agent')] : []),
+          ],
+        });
+      }),
+    );
+
+    renderSupport();
+    expect(await screen.findByText('Initial message')).not.toBeNull();
+    expect(detailCalls).toBe(1);
+    fireEvent.change(screen.getByLabelText('Reply'), { target: { value: 'Draft in progress' } });
+    const messageList = document.querySelector('[data-l4-message-list]');
+    if (!messageList) throw new Error('missing message list');
+    messageList.scrollTop = 37;
+    vi.useFakeTimers();
+
+    const visibilityState = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    act(() => document.dispatchEvent(new Event('visibilitychange')));
+    await act(() => vi.advanceTimersByTimeAsync(40_000));
+    expect(detailCalls).toBe(1);
+
+    visibilityState.mockReturnValue('visible');
+    act(() => document.dispatchEvent(new Event('visibilitychange')));
+    await act(() => vi.advanceTimersByTimeAsync(20_000));
+    vi.useRealTimers();
+
+    expect(await screen.findByText('New Vega reply')).not.toBeNull();
+    expect(screen.queryByText('Loading case...')).toBeNull();
+    expect((screen.getByLabelText('Reply') as HTMLTextAreaElement).value).toBe('Draft in progress');
+    expect(messageList.scrollTop).toBe(37);
+    expect(detailCalls).toBe(2);
   });
 
 });
