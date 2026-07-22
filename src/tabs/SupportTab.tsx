@@ -19,6 +19,7 @@ const FILTERS: Array<{ group: SupportStatusGroup; label: string }> = [
 type DetailState = 'idle' | 'loading' | 'ready' | 'missing' | 'error';
 type ListState = 'loading' | 'ready' | 'error';
 type RightPaneMode = 'detail' | 'new';
+type MobileView = 'list' | 'detail';
 
 export function SupportTab(): JSX.Element {
   const config = useConfig();
@@ -27,6 +28,7 @@ export function SupportTab(): JSX.Element {
   const [listState, setListState] = useState<ListState>('loading');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [rightPaneMode, setRightPaneMode] = useState<RightPaneMode>('detail');
+  const [mobileView, setMobileView] = useState<MobileView>('detail');
   const [activeFilter, setActiveFilter] = useState<SupportStatusGroup>('open');
   const [query, setQuery] = useState('');
   const [answers, setAnswers] = useState<DocResult[]>([]);
@@ -39,7 +41,10 @@ export function SupportTab(): JSX.Element {
 
   useEffect(() => {
     setSubject(supportDraftSubject);
-    if (supportDraftSubject) setRightPaneMode('new');
+    if (supportDraftSubject) {
+      setRightPaneMode('new');
+      setMobileView('detail');
+    }
   }, [supportDraftSubject]);
 
   useEffect(() => {
@@ -146,16 +151,19 @@ export function SupportTab(): JSX.Element {
   function selectCase(id: string) {
     setSelectedId(id);
     setRightPaneMode('detail');
+    setMobileView('detail');
   }
 
   function startNewCase() {
     setRightPaneMode('new');
+    setMobileView('detail');
     setFormError('');
   }
 
   function showListOnMobile() {
     setSelectedId(null);
     setRightPaneMode('detail');
+    setMobileView('list');
   }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -182,6 +190,7 @@ export function SupportTab(): JSX.Element {
       setCases((current) => [created, ...current.filter((item) => item.id !== created.id)]);
       setSelectedId(created.id);
       setRightPaneMode('detail');
+      setMobileView('detail');
       setActiveFilter(supportStatusView(created.status).group);
       emitEvent(config, { type: 'submit', caseId: created.id });
       form.reset();
@@ -212,8 +221,6 @@ export function SupportTab(): JSX.Element {
       setReplyError(apiErrorMessage(error));
     }
   }
-
-  const mobileView = rightPaneMode === 'new' || selectedId ? 'detail' : 'list';
 
   return (
     <div className="l4-support-console" data-l4-support-tab data-l4-mobile-view={mobileView}>

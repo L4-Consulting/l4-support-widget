@@ -202,6 +202,24 @@ describe('SupportTab', () => {
     expect(await screen.findByText("This case isn't available.")).not.toBeNull();
   });
 
+  it('keeps the mobile ticket list visible after Back', async () => {
+    server.use(
+      http.get(`${apiBase}/api/client/support/cases`, () => HttpResponse.json({ cases: [supportCase('case-1')] })),
+      http.get(`${apiBase}/api/client/support/cases/case-1`, () =>
+        HttpResponse.json({ case: supportCase('case-1'), messages: [message('msg-1', 'Initial message')] }),
+      ),
+    );
+
+    renderSupport();
+    expect(await screen.findByText('Initial message')).not.toBeNull();
+    const consoleElement = document.querySelector('[data-l4-support-tab]');
+    expect(consoleElement?.getAttribute('data-l4-mobile-view')).toBe('detail');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+    await waitFor(() => expect(consoleElement?.getAttribute('data-l4-mobile-view')).toBe('list'));
+  });
+
 });
 
 function supportCase(

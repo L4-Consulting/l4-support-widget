@@ -120,6 +120,7 @@ export class ApiClient {
     try {
       response = await fetch(`${this.#config.apiBase}${path}`, {
         method: options.method ?? 'GET',
+        signal: AbortSignal.timeout(10_000),
         credentials: 'omit',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -130,7 +131,7 @@ export class ApiClient {
         body: options.body === undefined ? undefined : JSON.stringify(options.body),
       });
     } catch {
-      if (!state.retriedServer) {
+      if ((!options.method || options.method === 'GET') && !state.retriedServer) {
         return this.#request<T>(path, options, { ...state, retriedServer: true });
       }
       this.#emit({ type: 'server_error', status: 'network' });
@@ -160,7 +161,7 @@ export class ApiClient {
     if (response.status === 400) throw new ValidationError(await readValidation(response));
 
     if (response.status >= 500) {
-      if (!state.retriedServer) {
+      if ((!options.method || options.method === 'GET') && !state.retriedServer) {
         return this.#request<T>(path, options, { ...state, retriedServer: true });
       }
       this.#emit({ type: 'server_error', status: response.status });
