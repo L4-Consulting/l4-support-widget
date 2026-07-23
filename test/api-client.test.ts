@@ -177,6 +177,59 @@ describe('ApiClient', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
+  it('does not retry a POST that returns a server error', async () => {
+    let postAttempts = 0;
+    server.use(
+      http.post(`${apiBase}/api/client/support/cases`, () => {
+        postAttempts += 1;
+        return HttpResponse.json({ error: 'down' }, { status: 500 });
+      }),
+    );
+
+    await expect(
+      new ApiClient(config()).createCase({
+        subject: 'Need help',
+        category: 'how_to',
+        severity: 'normal',
+      }),
+    ).rejects.toBeInstanceOf(ServerError);
+    expect(postAttempts).toBe(1);
+  });
+
+  it('does not retry a POST that returns 401', async () => {
+    let postAttempts = 0;
+    server.use(
+      http.post(`${apiBase}/api/client/support/cases`, () => {
+        postAttempts += 1;
+        return HttpResponse.json({ error: 'expired' }, { status: 401 });
+      }),
+    );
+
+    await expect(
+      new ApiClient(config()).createCase({
+        subject: 'Need help',
+        category: 'how_to',
+        severity: 'normal',
+      }),
+    ).rejects.toBeInstanceOf(SessionExpiredError);
+    expect(postAttempts).toBe(1);
+  });
+
+  it('maps a fetch timeout to ServerError instead of hanging', async () => {
+    const timeoutSignal = AbortSignal.abort();
+    const timeoutSpy = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeoutSignal);
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((_input, init) => {
+      expect(init?.signal).toBe(timeoutSignal);
+      return Promise.reject(new DOMException('Timed out', 'TimeoutError'));
+    });
+
+    await expect(new ApiClient(config()).listCases()).rejects.toBeInstanceOf(ServerError);
+    expect(timeoutSpy).toHaveBeenCalledTimes(2);
+    expect(timeoutSpy).toHaveBeenNthCalledWith(1, 10_000);
+    expect(timeoutSpy).toHaveBeenNthCalledWith(2, 10_000);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
   it('emits rate_limited and server_error telemetry for typed API failures', async () => {
     const onEvent = vi.fn();
     server.use(

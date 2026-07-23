@@ -1,5 +1,5 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { ConfigContext, type NormalizedConfig } from '../src/config';
@@ -10,7 +10,11 @@ const apiBase = 'https://api.example.test';
 const server = setupServer();
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+  server.resetHandlers();
+});
 afterAll(() => server.close());
 
 function renderSupport(configOverrides: Partial<NormalizedConfig> = {}) {
@@ -202,7 +206,155 @@ describe('SupportTab', () => {
     expect(await screen.findByText("This case isn't available.")).not.toBeNull();
   });
 
+  it('keeps the mobile ticket list visible after Back', async () => {
+    server.use(
+      http.get(`${apiBase}/api/client/support/cases`, () => HttpResponse.json({ cases: [supportCase('case-1')] })),
+      http.get(`${apiBase}/api/client/support/cases/case-1`, () =>
+        HttpResponse.json({ case: supportCase('case-1'), messages: [message('msg-1', 'Initial message')] }),
+      ),
+    );
+
+    renderSupport();
+    expect(await screen.findByText('Initial message')).not.toBeNull();
+    const consoleElement = document.querySelector('[data-l4-support-tab]');
+    expect(consoleElement?.getAttribute('data-l4-mobile-view')).toBe('detail');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+    await waitFor(() => expect(consoleElement?.getAttribute('data-l4-mobile-view')).toBe('list'));
+  });
+
+  it('silently polls a visible selected case and pauses while hidden', async () => {
+    let detailCalls = 0;
+    server.use(
+      http.get(`${apiBase}/api/client/support/cases`, () => HttpResponse.json({ cases: [supportCase('case-1')] })),
+      http.get(`${apiBase}/api/client/support/cases/case-1`, () => {
+        detailCalls += 1;
+        return HttpResponse.json({
+          case: supportCase('case-1'),
+          messages: [
+            message('msg-1', 'Initial message'),
+            ...(detailCalls > 1 ? [message('msg-2', 'New Vega reply', 'agent')] : []),
+          ],
+        });
+      }),
+    );
+
+    renderSupport();
+    expect(await screen.findByText('Initial message')).not.toBeNull();
+    expect(detailCalls).toBe(1);
+    fireEvent.change(screen.getByLabelText('Reply'), { target: { value: 'Draft in progress' } });
+    const messageList = document.querySelector('[data-l4-message-list]');
+    if (!messageList) throw new Error('missing message list');
+    messageList.scrollTop = 37;
+    vi.useFakeTimers();
+
+    const visibilityState = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    act(() => document.dispatchEvent(new Event('visibilitychange')));
+    await act(() => vi.advanceTimersByTimeAsync(40_000));
+    expect(detailCalls).toBe(1);
+
+    visibilityState.mockReturnValue('visible');
+    act(() => document.dispatchEvent(new Event('visibilitychange')));
+    await act(() => vi.advanceTimersByTimeAsync(20_000));
+    vi.useRealTimers();
+
+    expect(await screen.findByText('New Vega reply')).not.toBeNull();
+    expect(screen.queryByText('Loading case...')).toBeNull();
+    expect((screen.getByLabelText('Reply') as HTMLTextAreaElement).value).toBe('Draft in progress');
+    expect(messageList.scrollTop).toBe(37);
+    expect(detailCalls).toBe(2);
+  });
+
+  it('keeps the newest detail when an older fetch resolves out of order', async () => {
+    vi.spyOn(AbortSignal, 'timeout').mockReturnValue(new AbortController().signal);
+    const firstResponse = deferred<Response>();
+    const secondResponse = deferred<Response>();
+    let detailCalls = 0;
+    server.use(
+      http.get(`${apiBase}/api/client/support/cases`, () => HttpResponse.json({ cases: [supportCase('case-1')] })),
+      http.get(`${apiBase}/api/client/support/cases/case-1`, () => {
+        detailCalls += 1;
+        return detailCalls === 1 ? firstResponse.promise : secondResponse.promise;
+      }),
+    );
+
+    renderSupport();
+    await waitFor(() => expect(detailCalls).toBe(1));
+    vi.useFakeTimers();
+    act(() => document.dispatchEvent(new Event('visibilitychange')));
+    await act(() => vi.advanceTimersByTimeAsync(20_000));
+    expect(detailCalls).toBe(2);
+    vi.useRealTimers();
+
+    secondResponse.resolve(HttpResponse.json({
+      case: supportCase('case-1'),
+      messages: [message('msg-2', 'New Vega reply', 'agent')],
+    }));
+    expect(await screen.findByText('New Vega reply')).not.toBeNull();
+
+    firstResponse.resolve(HttpResponse.json({
+      case: supportCase('case-1'),
+      messages: [message('msg-1', 'Older snapshot')],
+    }));
+
+    await waitFor(() => expect(screen.queryByText('Older snapshot')).toBeNull());
+    expect(screen.getByText('New Vega reply')).not.toBeNull();
+  });
+
+  it('does not let an in-flight poll erase a just-sent reply', async () => {
+    vi.spyOn(AbortSignal, 'timeout').mockReturnValue(new AbortController().signal);
+    const pollResponse = deferred<Response>();
+    let detailCalls = 0;
+    server.use(
+      http.get(`${apiBase}/api/client/support/cases`, () => HttpResponse.json({ cases: [supportCase('case-1')] })),
+      http.get(`${apiBase}/api/client/support/cases/case-1`, () => {
+        detailCalls += 1;
+        if (detailCalls === 1) {
+          return HttpResponse.json({ case: supportCase('case-1'), messages: [message('msg-1', 'Initial message')] });
+        }
+        return pollResponse.promise;
+      }),
+      http.post(`${apiBase}/api/client/support/cases/case-1/messages`, () =>
+        HttpResponse.json({ message: message('msg-2', 'Just sent reply') }, { status: 201 }),
+      ),
+    );
+
+    renderSupport();
+    expect(await screen.findByText('Initial message')).not.toBeNull();
+    vi.useFakeTimers();
+    act(() => document.dispatchEvent(new Event('visibilitychange')));
+    await act(() => vi.advanceTimersByTimeAsync(20_000));
+    expect(detailCalls).toBe(2);
+    vi.useRealTimers();
+
+    fireEvent.change(screen.getByLabelText('Reply'), { target: { value: 'Just sent reply' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+    const messageList = document.querySelector('[data-l4-message-list]');
+    if (!messageList) throw new Error('missing message list');
+    expect(await within(messageList as HTMLElement).findByText('Just sent reply')).not.toBeNull();
+
+    await act(async () => {
+      pollResponse.resolve(HttpResponse.json({
+        case: supportCase('case-1'),
+        messages: [message('msg-poll', 'Poll snapshot')],
+      }));
+      await new Promise((resolve) => window.setTimeout(resolve, 20));
+    });
+
+    expect(within(messageList as HTMLElement).queryByText('Poll snapshot')).toBeNull();
+    expect(within(messageList as HTMLElement).getByText('Just sent reply')).not.toBeNull();
+  });
+
 });
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((nextResolve) => {
+    resolve = nextResolve;
+  });
+  return { promise, resolve };
+}
 
 function supportCase(
   id: string,

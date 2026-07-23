@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type JSX } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type JSX } from 'react';
 import { ApiClient, NotEnabledError, NotFoundError, RateLimitedError, ServerError, SessionExpiredError, ValidationError } from '../api/client';
 import type { CaseCategory, CaseDetail, CaseEvent, CaseMessage, CaseSeverity, SupportCase, DocResult } from '../api/types';
 import { emitEvent, useConfig } from '../config';
@@ -10,6 +10,7 @@ const CATEGORIES: CaseCategory[] = ['how_to', 'bug', 'billing', 'refund', 'acces
 const SEVERITIES: CaseSeverity[] = ['low', 'normal', 'high'];
 const MIN_SEARCH_LENGTH = 3;
 const SEARCH_DEBOUNCE_MS = 300;
+const DETAIL_POLL_MS = 20_000;
 const FILTERS: Array<{ group: SupportStatusGroup; label: string }> = [
   { group: 'open', label: strings.supportFilterOpen },
   { group: 'waiting', label: strings.supportFilterWaiting },
@@ -19,6 +20,7 @@ const FILTERS: Array<{ group: SupportStatusGroup; label: string }> = [
 type DetailState = 'idle' | 'loading' | 'ready' | 'missing' | 'error';
 type ListState = 'loading' | 'ready' | 'error';
 type RightPaneMode = 'detail' | 'new';
+type MobileView = 'list' | 'detail';
 
 export function SupportTab(): JSX.Element {
   const config = useConfig();
@@ -27,11 +29,14 @@ export function SupportTab(): JSX.Element {
   const [listState, setListState] = useState<ListState>('loading');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [rightPaneMode, setRightPaneMode] = useState<RightPaneMode>('detail');
+  const [mobileView, setMobileView] = useState<MobileView>('detail');
   const [activeFilter, setActiveFilter] = useState<SupportStatusGroup>('open');
   const [query, setQuery] = useState('');
   const [answers, setAnswers] = useState<DocResult[]>([]);
   const [detail, setDetail] = useState<CaseDetail | null>(null);
   const [detailState, setDetailState] = useState<DetailState>('idle');
+  const detailRequestSequence = useRef(0);
+  const latestDetailRequest = useRef<{ caseId: string | null; sequence: number }>({ caseId: null, sequence: 0 });
   const [formError, setFormError] = useState('');
   const [replyError, setReplyError] = useState('');
   const { supportDraftSubject } = useTabState();
@@ -39,7 +44,10 @@ export function SupportTab(): JSX.Element {
 
   useEffect(() => {
     setSubject(supportDraftSubject);
-    if (supportDraftSubject) setRightPaneMode('new');
+    if (supportDraftSubject) {
+      setRightPaneMode('new');
+      setMobileView('detail');
+    }
   }, [supportDraftSubject]);
 
   useEffect(() => {
@@ -73,21 +81,55 @@ export function SupportTab(): JSX.Element {
       return;
     }
     let alive = true;
+    let polling = false;
+    let intervalId: number | undefined;
     setDetailState('loading');
-    api
-      .getCase(selectedId)
+    const fetchDetail = (silent = false) => {
+      if (silent && polling) return;
+      if (silent) polling = true;
+      const requestSequence = ++detailRequestSequence.current;
+      latestDetailRequest.current = { caseId: selectedId, sequence: requestSequence };
+      api.getCase(selectedId)
       .then((nextDetail) => {
-        if (!alive) return;
+        if (!alive || latestDetailRequest.current.caseId !== selectedId || latestDetailRequest.current.sequence !== requestSequence) return;
         setDetail(nextDetail);
         setDetailState('ready');
       })
       .catch((error: unknown) => {
-        if (!alive) return;
+        if (
+          !alive
+          || silent
+          || latestDetailRequest.current.caseId !== selectedId
+          || latestDetailRequest.current.sequence !== requestSequence
+        ) return;
         setDetail(null);
         setDetailState(error instanceof NotFoundError ? 'missing' : 'error');
+      })
+      .finally(() => {
+        polling = false;
       });
+    };
+    const stopPolling = () => {
+      if (intervalId !== undefined) window.clearInterval(intervalId);
+      intervalId = undefined;
+    };
+    const startPolling = () => {
+      stopPolling();
+      if (document.visibilityState !== 'visible') return;
+      intervalId = window.setInterval(() => fetchDetail(true), DETAIL_POLL_MS);
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') startPolling();
+      else stopPolling();
+    };
+
+    fetchDetail();
+    startPolling();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       alive = false;
+      stopPolling();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [api, rightPaneMode, selectedId]);
 
@@ -146,16 +188,19 @@ export function SupportTab(): JSX.Element {
   function selectCase(id: string) {
     setSelectedId(id);
     setRightPaneMode('detail');
+    setMobileView('detail');
   }
 
   function startNewCase() {
     setRightPaneMode('new');
+    setMobileView('detail');
     setFormError('');
   }
 
   function showListOnMobile() {
     setSelectedId(null);
     setRightPaneMode('detail');
+    setMobileView('list');
   }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -182,6 +227,7 @@ export function SupportTab(): JSX.Element {
       setCases((current) => [created, ...current.filter((item) => item.id !== created.id)]);
       setSelectedId(created.id);
       setRightPaneMode('detail');
+      setMobileView('detail');
       setActiveFilter(supportStatusView(created.status).group);
       emitEvent(config, { type: 'submit', caseId: created.id });
       form.reset();
@@ -203,7 +249,9 @@ export function SupportTab(): JSX.Element {
       return;
     }
     try {
+      latestDetailRequest.current = { caseId: selectedId, sequence: ++detailRequestSequence.current };
       const message = await api.replyToCase(selectedId, { body });
+      latestDetailRequest.current = { caseId: selectedId, sequence: ++detailRequestSequence.current };
       setDetail((current) => (current ? { ...current, messages: [...current.messages, message] } : current));
       setCases((current) => current.map((item) => (item.id === selectedId ? { ...item, last_customer_message_preview: body } : item)));
       emitEvent(config, { type: 'support_case_replied', caseId: selectedId });
@@ -212,8 +260,6 @@ export function SupportTab(): JSX.Element {
       setReplyError(apiErrorMessage(error));
     }
   }
-
-  const mobileView = rightPaneMode === 'new' || selectedId ? 'detail' : 'list';
 
   return (
     <div className="l4-support-console" data-l4-support-tab data-l4-mobile-view={mobileView}>
