@@ -70,6 +70,44 @@ describe('public API', () => {
     });
   });
 
+  it('preserves the current text launcher and L4 header when avatar options are unset', async () => {
+    act(() => {
+      init({
+        productKey: 'civickit',
+        apiBase: 'https://api.example.test',
+        getToken: () => 'tok',
+      });
+      open();
+    });
+
+    await waitFor(() => {
+      const root = document.querySelector(ELEMENT_NAME)?.shadowRoot;
+      expect(root?.querySelector('[data-l4-launcher]')?.textContent).toBe('Support');
+      expect(root?.querySelector('[data-l4-launcher-avatar]')).toBeNull();
+      expect(root?.querySelector('[data-l4-header-avatar]')).toBeNull();
+      expect(root?.querySelector('.l4-mark')?.textContent).toBe('L4');
+    });
+  });
+
+  it('renders header and launcher avatars only when explicitly enabled', async () => {
+    act(() => {
+      init({
+        productKey: 'civickit',
+        apiBase: 'https://api.example.test',
+        getToken: () => 'tok',
+        avatar: { enabled: true },
+        launcherAvatar: true,
+      });
+      open();
+    });
+
+    await waitFor(() => {
+      const root = document.querySelector(ELEMENT_NAME)?.shadowRoot;
+      expect(root?.querySelector('[data-l4-launcher-avatar]')).not.toBeNull();
+      expect(root?.querySelector('[data-l4-header-avatar]')).not.toBeNull();
+    });
+  });
+
   it('destroy is safe before init and idempotently removes host and head injections', async () => {
     act(() => {
       destroy();

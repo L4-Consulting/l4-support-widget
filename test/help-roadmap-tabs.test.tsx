@@ -28,7 +28,9 @@ function config(overrides: Partial<NormalizedConfig> = {}): NormalizedConfig {
     getToken: () => 'tok',
     tabs: ['help', 'support', 'roadmap'],
     theme: { accent: '#2563eb', mode: 'light' },
-    launcher: { enabled: true, position: 'br' },
+    launcher: { enabled: true, position: 'br', avatar: false },
+    avatar: { enabled: false },
+    voice: { enabled: false },
     ...overrides,
   };
   return { ...baseConfig, productLabel: overrides.productLabel ?? baseConfig.productLabel };
