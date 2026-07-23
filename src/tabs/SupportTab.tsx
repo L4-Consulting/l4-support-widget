@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type JSX } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type JSX } from 'react';
 import { ApiClient, NotEnabledError, NotFoundError, RateLimitedError, ServerError, SessionExpiredError, ValidationError } from '../api/client';
 import type { CaseCategory, CaseDetail, CaseEvent, CaseMessage, CaseSeverity, SupportCase, DocResult } from '../api/types';
 import { emitEvent, useConfig } from '../config';
@@ -35,6 +35,8 @@ export function SupportTab(): JSX.Element {
   const [answers, setAnswers] = useState<DocResult[]>([]);
   const [detail, setDetail] = useState<CaseDetail | null>(null);
   const [detailState, setDetailState] = useState<DetailState>('idle');
+  const detailRequestSequence = useRef(0);
+  const latestDetailRequest = useRef<{ caseId: string | null; sequence: number }>({ caseId: null, sequence: 0 });
   const [formError, setFormError] = useState('');
   const [replyError, setReplyError] = useState('');
   const { supportDraftSubject } = useTabState();
@@ -85,14 +87,21 @@ export function SupportTab(): JSX.Element {
     const fetchDetail = (silent = false) => {
       if (silent && polling) return;
       if (silent) polling = true;
+      const requestSequence = ++detailRequestSequence.current;
+      latestDetailRequest.current = { caseId: selectedId, sequence: requestSequence };
       api.getCase(selectedId)
       .then((nextDetail) => {
-        if (!alive) return;
+        if (!alive || latestDetailRequest.current.caseId !== selectedId || latestDetailRequest.current.sequence !== requestSequence) return;
         setDetail(nextDetail);
         setDetailState('ready');
       })
       .catch((error: unknown) => {
-        if (!alive || silent) return;
+        if (
+          !alive
+          || silent
+          || latestDetailRequest.current.caseId !== selectedId
+          || latestDetailRequest.current.sequence !== requestSequence
+        ) return;
         setDetail(null);
         setDetailState(error instanceof NotFoundError ? 'missing' : 'error');
       })
@@ -240,7 +249,9 @@ export function SupportTab(): JSX.Element {
       return;
     }
     try {
+      latestDetailRequest.current = { caseId: selectedId, sequence: ++detailRequestSequence.current };
       const message = await api.replyToCase(selectedId, { body });
+      latestDetailRequest.current = { caseId: selectedId, sequence: ++detailRequestSequence.current };
       setDetail((current) => (current ? { ...current, messages: [...current.messages, message] } : current));
       setCases((current) => current.map((item) => (item.id === selectedId ? { ...item, last_customer_message_preview: body } : item)));
       emitEvent(config, { type: 'support_case_replied', caseId: selectedId });

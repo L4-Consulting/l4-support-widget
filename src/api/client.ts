@@ -144,7 +144,7 @@ export class ApiClient {
     }
 
     if (response.status === 401) {
-      if (!state.retriedAuth) {
+      if ((!options.method || options.method === 'GET') && !state.retriedAuth) {
         return this.#request<T>(path, options, { ...state, retriedAuth: true });
       }
       this.#emit({ type: 'session_expired', status: 401 });

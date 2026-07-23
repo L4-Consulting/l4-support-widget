@@ -196,6 +196,25 @@ describe('ApiClient', () => {
     expect(postAttempts).toBe(1);
   });
 
+  it('does not retry a POST that returns 401', async () => {
+    let postAttempts = 0;
+    server.use(
+      http.post(`${apiBase}/api/client/support/cases`, () => {
+        postAttempts += 1;
+        return HttpResponse.json({ error: 'expired' }, { status: 401 });
+      }),
+    );
+
+    await expect(
+      new ApiClient(config()).createCase({
+        subject: 'Need help',
+        category: 'how_to',
+        severity: 'normal',
+      }),
+    ).rejects.toBeInstanceOf(SessionExpiredError);
+    expect(postAttempts).toBe(1);
+  });
+
   it('maps a fetch timeout to ServerError instead of hanging', async () => {
     const timeoutSignal = AbortSignal.abort();
     const timeoutSpy = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeoutSignal);
