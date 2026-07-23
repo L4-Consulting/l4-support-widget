@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type JSX } from 'react';
 import { ApiClient, NotEnabledError, NotFoundError, RateLimitedError, ServerError, SessionExpiredError, ValidationError } from '../api/client';
 import type { CaseCategory, CaseDetail, CaseEvent, CaseMessage, CaseSeverity, SupportCase, DocResult } from '../api/types';
-import { emitEvent, useConfig } from '../config';
+import { emitEvent, emitNarration, useConfig } from '../config';
 import { strings } from '../strings';
 import { useTabState } from '../tab-state';
 import { supportStatusView, type SupportStatusGroup } from './support-status';
+import vegaAvatarUrl from '../assets/vega-profile-128.jpg';
 
 const CATEGORIES: CaseCategory[] = ['how_to', 'bug', 'billing', 'refund', 'access', 'feature_request', 'implementation', 'data', 'other'];
 const SEVERITIES: CaseSeverity[] = ['low', 'normal', 'high'];
@@ -484,6 +485,24 @@ function CaseDetailPanel({
   onReply: (event: FormEvent<HTMLFormElement>) => void;
   replyError: string;
 }): JSX.Element {
+  const config = useConfig();
+  const narratedMessageIds = useRef(new Set<string>());
+
+  useEffect(() => {
+    if (!config.voice.enabled || !config.onNarrate || !detail) return;
+    for (const message of detail.messages) {
+      if (message.author_type !== 'agent' || narratedMessageIds.current.has(message.id)) continue;
+      narratedMessageIds.current.add(message.id);
+      emitNarration(config, {
+        id: message.id,
+        body: message.body,
+        author_type: 'agent',
+        author_name: message.author_name,
+        created_at: message.created_at,
+      });
+    }
+  }, [config, detail]);
+
   if (state === 'idle') return <EmptyThread />;
   if (state === 'loading') return <StateMessage tone="loading">{strings.caseLoading}</StateMessage>;
   if (state === 'missing') return <StateMessage tone="empty">{strings.caseUnavailable}</StateMessage>;
@@ -546,7 +565,7 @@ function MessageItem({ message }: { message: CaseMessage }): JSX.Element {
   const authorName = isCustomer ? strings.supportYouAuthor : message.author_name || strings.supportAgentAuthor;
   return (
     <li className="l4-message" data-author={isCustomer ? 'customer' : 'l4'}>
-      <div className="l4-avatar">{isCustomer ? initials(authorName) : l4Initials(message)}</div>
+      <MessageAvatar message={message} authorName={authorName} isCustomer={isCustomer} />
       <div className="l4-message-body">
         <div className="l4-message-who">
           {isCustomer ? (
@@ -563,6 +582,29 @@ function MessageItem({ message }: { message: CaseMessage }): JSX.Element {
       </div>
     </li>
   );
+}
+
+function MessageAvatar({
+  message,
+  authorName,
+  isCustomer,
+}: {
+  message: CaseMessage;
+  authorName: string;
+  isCustomer: boolean;
+}): JSX.Element {
+  const config = useConfig();
+  if (message.author_type === 'agent' && config.avatar.enabled) {
+    return (
+      <img
+        className="l4-avatar l4-agent-avatar"
+        src={vegaAvatarUrl}
+        alt=""
+        data-l4-agent-avatar
+      />
+    );
+  }
+  return <div className="l4-avatar">{isCustomer ? initials(authorName) : l4Initials(message)}</div>;
 }
 
 function EventItem({ event }: { event: CaseEvent }): JSX.Element | null {
