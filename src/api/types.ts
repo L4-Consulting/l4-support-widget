@@ -4,7 +4,7 @@
  * These are deliberately a small (~8-field) UI projection of the backend
  * shapes. We do NOT mirror the raw `work_items` row, and the CaseDetail
  * envelope intentionally IGNORES keys the widget does not render
- * (deliveries / events / attachments / knowledge_links / csat / automation_runs).
+ * (deliveries / events / attachments / knowledge_links / automation_runs).
  *
  * Contract source: l4-cos `/api/client/*` (PR #666 + #676). Field lists are
  * frozen per the v2 plan's "API CONTRACT" correction. Widen only via a
@@ -77,6 +77,17 @@ export interface CaseEvent {
 }
 
 /**
+ * Client CSAT submission — 1..5 star rating with an optional comment.
+ * Returned shape is the same so the UI can render the submitted state
+ * directly from POST and GET responses.
+ */
+export interface CaseCsat {
+  rating: 1 | 2 | 3 | 4 | 5;
+  comment?: string | null;
+  submitted_at: string;
+}
+
+/**
  * Detail envelope from `GET /api/client/support/cases/:id`.
  * The raw backend envelope carries more keys; we narrow to rendered fields.
  */
@@ -84,6 +95,8 @@ export interface CaseDetail {
   case: SupportCase;
   messages: CaseMessage[];
   events?: CaseEvent[];
+  /** Present once the member has submitted CSAT for a resolved/closed case. */
+  csat?: CaseCsat | null;
 }
 
 /** Request body for `POST /api/client/support/cases`. Only `subject` is required. */
@@ -97,6 +110,12 @@ export interface CreateCaseBody {
 /** Request body for `POST /api/client/support/cases/:id/messages`. */
 export interface CreateMessageBody {
   body: string;
+}
+
+/** Request body for `POST /api/client/support/cases/:id/csat`. */
+export interface SubmitCsatBody {
+  rating: 1 | 2 | 3 | 4 | 5;
+  comment?: string;
 }
 
 /** A client-visible roadmap entry from `GET /api/client/roadmap`. */
