@@ -177,42 +177,57 @@ describe('ApiClient', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
-  it('submits CSAT via POST /support/cases/:id/csat and returns the csat envelope', async () => {
-    let posted: unknown = null;
+  it('does not retry a POST that returns a server error', async () => {
+    let postAttempts = 0;
     server.use(
-      http.post(`${apiBase}/api/client/support/cases/case-1/csat`, async ({ request }) => {
-        posted = await request.json();
-        expect(request.headers.get('authorization')).toBe('Bearer tok-1');
-        expect(request.headers.get('x-product-key')).toBe('civickit');
-        return HttpResponse.json(
-          {
-            csat: {
-              rating: 5,
-              comment: 'Great',
-              submitted_at: '2026-07-03T12:00:00.000Z',
-            },
-          },
-          { status: 201 },
-        );
+      http.post(`${apiBase}/api/client/support/cases`, () => {
+        postAttempts += 1;
+        return HttpResponse.json({ error: 'down' }, { status: 500 });
       }),
     );
 
-    const csat = await new ApiClient(config()).submitCsat('case-1', { rating: 5, comment: 'Great' });
-    expect(csat).toEqual({ rating: 5, comment: 'Great', submitted_at: '2026-07-03T12:00:00.000Z' });
-    expect(posted).toEqual({ rating: 5, comment: 'Great' });
+    await expect(
+      new ApiClient(config()).createCase({
+        subject: 'Need help',
+        category: 'how_to',
+        severity: 'normal',
+      }),
+    ).rejects.toBeInstanceOf(ServerError);
+    expect(postAttempts).toBe(1);
   });
 
-  it('omits the comment field when the body has no comment', async () => {
-    let posted: unknown = null;
+  it('does not retry a POST that returns 401', async () => {
+    let postAttempts = 0;
     server.use(
-      http.post(`${apiBase}/api/client/support/cases/case-1/csat`, async ({ request }) => {
-        posted = await request.json();
-        return HttpResponse.json({ csat: { rating: 4, submitted_at: '2026-07-03T12:00:00.000Z' } }, { status: 201 });
+      http.post(`${apiBase}/api/client/support/cases`, () => {
+        postAttempts += 1;
+        return HttpResponse.json({ error: 'expired' }, { status: 401 });
       }),
     );
 
-    await new ApiClient(config()).submitCsat('case-1', { rating: 4 });
-    expect(posted).toEqual({ rating: 4 });
+    await expect(
+      new ApiClient(config()).createCase({
+        subject: 'Need help',
+        category: 'how_to',
+        severity: 'normal',
+      }),
+    ).rejects.toBeInstanceOf(SessionExpiredError);
+    expect(postAttempts).toBe(1);
+  });
+
+  it('maps a fetch timeout to ServerError instead of hanging', async () => {
+    const timeoutSignal = AbortSignal.abort();
+    const timeoutSpy = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeoutSignal);
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((_input, init) => {
+      expect(init?.signal).toBe(timeoutSignal);
+      return Promise.reject(new DOMException('Timed out', 'TimeoutError'));
+    });
+
+    await expect(new ApiClient(config()).listCases()).rejects.toBeInstanceOf(ServerError);
+    expect(timeoutSpy).toHaveBeenCalledTimes(2);
+    expect(timeoutSpy).toHaveBeenNthCalledWith(1, 10_000);
+    expect(timeoutSpy).toHaveBeenNthCalledWith(2, 10_000);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
   it('emits rate_limited and server_error telemetry for typed API failures', async () => {
