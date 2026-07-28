@@ -25,7 +25,9 @@ function renderSupport(configOverrides: Partial<NormalizedConfig> = {}) {
     getToken: () => 'tok',
     tabs: ['support'],
     theme: { accent: '#2563eb', mode: 'light' },
-    launcher: { enabled: true, position: 'br' },
+    launcher: { enabled: true, position: 'br', avatar: false },
+    avatar: { enabled: false },
+    voice: { enabled: false },
     ...configOverrides,
   };
   const config: NormalizedConfig = { ...baseConfig, productLabel: configOverrides.productLabel ?? baseConfig.productLabel };
@@ -39,6 +41,60 @@ function renderSupport(configOverrides: Partial<NormalizedConfig> = {}) {
 }
 
 describe('SupportTab', () => {
+  it('keeps avatar and narration behavior off by default', async () => {
+    const narrate = vi.fn();
+    server.use(
+      http.get(`${apiBase}/api/client/support/cases`, () => HttpResponse.json({ cases: [supportCase('case-1')] })),
+      http.get(`${apiBase}/api/client/support/cases/case-1`, () =>
+        HttpResponse.json({
+          case: supportCase('case-1'),
+          messages: [
+            message('msg-client', 'Customer message', 'client'),
+            message('msg-agent', 'Agent message', 'agent'),
+          ],
+        }),
+      ),
+    );
+
+    renderSupport({ onNarrate: narrate });
+
+    expect(await screen.findByText('Agent message')).not.toBeNull();
+    expect(document.querySelector('[data-l4-agent-avatar]')).toBeNull();
+    expect(narrate).not.toHaveBeenCalled();
+  });
+
+  it('renders Vega only for agent messages and narrates each agent message once when opted in', async () => {
+    const narrate = vi.fn();
+    server.use(
+      http.get(`${apiBase}/api/client/support/cases`, () => HttpResponse.json({ cases: [supportCase('case-1')] })),
+      http.get(`${apiBase}/api/client/support/cases/case-1`, () =>
+        HttpResponse.json({
+          case: supportCase('case-1'),
+          messages: [
+            message('msg-client', 'Customer message', 'client'),
+            message('msg-agent', 'Agent message', 'agent'),
+            message('msg-human', 'Human message', 'human', 'Jordan Lee'),
+          ],
+        }),
+      ),
+    );
+
+    renderSupport({
+      avatar: { enabled: true },
+      voice: { enabled: true, provider: 'host' },
+      onNarrate: narrate,
+    });
+
+    expect(await screen.findByText('Agent message')).not.toBeNull();
+    expect(document.querySelectorAll('[data-l4-agent-avatar]')).toHaveLength(1);
+    await waitFor(() => expect(narrate).toHaveBeenCalledOnce());
+    expect(narrate).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'msg-agent',
+      body: 'Agent message',
+      author_type: 'agent',
+    }));
+  });
+
   it('renders list cases and appends a reply', async () => {
     server.use(
       http.get(`${apiBase}/api/client/support/cases`, () => HttpResponse.json({ cases: [supportCase('case-1')] })),

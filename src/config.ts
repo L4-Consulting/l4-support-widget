@@ -3,6 +3,14 @@ import { createContext, useContext } from 'react';
 /** Host-supplied token getter; may be sync or async. */
 export type TokenProvider = () => string | null | Promise<string | null>;
 
+export interface NarrationMessage {
+  id: string;
+  body: string;
+  author_type: 'agent';
+  author_name?: string | null;
+  created_at: string;
+}
+
 /** Mount-time configuration for the widget. */
 export interface L4SupportInit {
   /** Sent as `X-Product-Key`. */
@@ -17,6 +25,14 @@ export interface L4SupportInit {
   tabs?: Array<'help' | 'support' | 'roadmap'>;
   theme?: { accent?: string; mode?: 'light' | 'dark' | 'auto' };
   launcher?: { enabled?: boolean; position?: 'br' | 'bl' };
+  /** Enables Vega imagery in the header and agent messages. Default: false. */
+  avatar?: { enabled?: boolean };
+  /** Replaces the launcher text with Vega's face. Requires avatar.enabled. Default: false. */
+  launcherAvatar?: boolean;
+  /** Declares host-managed narration capability. The widget performs no audio or network work. */
+  voice?: { enabled?: boolean; provider?: string };
+  /** Host callback invoked once for each rendered agent message while voice is enabled. */
+  onNarrate?: (message: NarrationMessage) => void;
   onEvent?: (e: { type: string; [k: string]: unknown }) => void;
 }
 
@@ -41,7 +57,16 @@ export interface NormalizedConfig {
   launcher: {
     enabled: boolean;
     position: LauncherPosition;
+    avatar: boolean;
   };
+  avatar: {
+    enabled: boolean;
+  };
+  voice: {
+    enabled: boolean;
+    provider?: string;
+  };
+  onNarrate?: (message: NarrationMessage) => void;
   onEvent?: (event: WidgetEvent) => void;
 }
 
@@ -92,6 +117,10 @@ export function normalizeConfig(opts: L4SupportInit, fallbackTokenProvider?: Tok
   const position = opts.launcher?.position === 'bl' ? 'bl' : 'br';
   const mode = opts.theme?.mode === 'dark' || opts.theme?.mode === 'auto' ? opts.theme.mode : 'light';
   const accent = typeof opts.theme?.accent === 'string' && opts.theme.accent.trim() ? opts.theme.accent : DEFAULT_ACCENT;
+  const avatarEnabled = opts.avatar?.enabled === true;
+  const voiceProvider = typeof opts.voice?.provider === 'string' && opts.voice.provider.trim()
+    ? opts.voice.provider.trim()
+    : undefined;
 
   return {
     productKey,
@@ -103,7 +132,11 @@ export function normalizeConfig(opts: L4SupportInit, fallbackTokenProvider?: Tok
     launcher: {
       enabled: opts.launcher?.enabled !== false,
       position,
+      avatar: avatarEnabled && opts.launcherAvatar === true,
     },
+    avatar: { enabled: avatarEnabled },
+    voice: { enabled: opts.voice?.enabled === true, provider: voiceProvider },
+    onNarrate: opts.onNarrate,
     onEvent: opts.onEvent,
   };
 }
@@ -113,6 +146,17 @@ export function emitEvent(config: Pick<NormalizedConfig, 'onEvent'> | null, even
     config?.onEvent?.(event);
   } catch {
     // Host telemetry must never break the widget.
+  }
+}
+
+export function emitNarration(
+  config: Pick<NormalizedConfig, 'onNarrate'> | null,
+  message: NarrationMessage,
+): void {
+  try {
+    config?.onNarrate?.(message);
+  } catch {
+    // Host narration must never break the widget.
   }
 }
 

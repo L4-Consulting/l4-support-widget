@@ -1,6 +1,6 @@
 {
   "name": "@l4/support-widget",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "L4 Consulting shared embeddable support widget (Help / My Support / Roadmap).",
   "type": "module",
   "license": "UNLICENSED",

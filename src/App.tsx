@@ -18,6 +18,7 @@ import { TabStateContext, type OpenSupportOptions } from './tab-state';
 import { HelpTab } from './tabs/HelpTab';
 import { RoadmapTab } from './tabs/RoadmapTab';
 import { SupportTab } from './tabs/SupportTab';
+import vegaAvatarUrl from './assets/vega-profile-128.jpg';
 
 export interface AppProps {
   config: L4SupportInit;
@@ -76,10 +77,13 @@ function Launcher({ config, onOpen }: { config: NormalizedConfig; onOpen: () => 
       className={`l4-launcher ${sideClass}`}
       type="button"
       data-l4-launcher
+      data-avatar={config.launcher.avatar}
       onClick={onOpen}
       aria-label={strings.launcherLabel}
     >
-      {strings.launcherText}
+      {config.launcher.avatar ? (
+        <img className="l4-launcher-avatar" src={vegaAvatarUrl} alt="" data-l4-launcher-avatar />
+      ) : strings.launcherText}
     </button>
   );
 }
@@ -147,7 +151,11 @@ function PanelPortal({
           data-l4-panel
         >
           <header className="l4-panel-header" data-l4-surface>
-            <div className="l4-mark">{strings.headerMark}</div>
+            {config.avatar.enabled ? (
+              <img className="l4-header-avatar" src={vegaAvatarUrl} alt="" data-l4-header-avatar />
+            ) : (
+              <div className="l4-mark">{strings.headerMark}</div>
+            )}
             <div>
               <h2>{strings.headerTitle}</h2>
               <p>{config.productLabel}</p>
