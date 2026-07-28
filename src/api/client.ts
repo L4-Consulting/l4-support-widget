@@ -1,4 +1,5 @@
 import type {
+  CaseCsat,
   CaseDetail,
   CaseMessage,
   CreateCaseBody,
@@ -7,6 +8,7 @@ import type {
   DocsSearchResponse,
   ListCasesResponse,
   RoadmapResponse,
+  SubmitCsatBody,
 } from './types';
 import { emitEvent, type NormalizedConfig, type WidgetEvent } from '../config';
 import { strings } from '../strings';
@@ -64,6 +66,13 @@ export class NotFoundError extends Error {
   }
 }
 
+export class ConflictError extends Error {
+  constructor(message: string) {
+    super(message || strings.genericError);
+    this.name = 'ConflictError';
+  }
+}
+
 export class ApiClient {
   #config: NormalizedConfig;
 
@@ -91,6 +100,13 @@ export class ApiClient {
       method: 'POST',
       body,
     }).then((result) => result.message);
+  }
+
+  submitCsat(caseId: string, body: SubmitCsatBody): Promise<CaseCsat> {
+    return this.#request<{ csat: CaseCsat }>(`/api/client/support/cases/${encodeURIComponent(caseId)}/csat`, {
+      method: 'POST',
+      body,
+    }).then((result) => result.csat);
   }
 
   searchDocs(q: string): Promise<DocsSearchResponse> {
@@ -153,6 +169,10 @@ export class ApiClient {
 
     if (response.status === 403) throw new NotEnabledError();
     if (response.status === 404) throw new NotFoundError();
+    if (response.status === 409) {
+      const payload = await readValidation(response).catch(() => ({ error: '' }));
+      throw new ConflictError(payload.error);
+    }
     if (response.status === 429) {
       const retryAfter = parseRetryAfter(response.headers.get('Retry-After'));
       this.#emit({ type: 'rate_limited', status: 429, retryAfter });

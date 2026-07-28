@@ -242,6 +242,34 @@ describe('SupportTab', () => {
     expect(screen.queryByText('No status')).toBeNull();
   });
 
+  it('renders CSAT only for resolved and closed cases', async () => {
+    const cases = [
+      supportCase('case-open', 'Open case', 'CASE-2026-02001', 'triaging'),
+      supportCase('case-resolved', 'Resolved case', 'CASE-2026-02002', 'resolved'),
+      supportCase('case-closed', 'Closed case', 'CASE-2026-02003', 'closed'),
+    ];
+    server.use(
+      http.get(`${apiBase}/api/client/support/cases`, () => HttpResponse.json({ cases })),
+      http.get(`${apiBase}/api/client/support/cases/:caseId`, ({ params }) => {
+        const supportCase = cases.find((item) => item.id === params.caseId);
+        return supportCase
+          ? HttpResponse.json({ case: supportCase, messages: [] })
+          : HttpResponse.json({ error: 'missing' }, { status: 404 });
+      }),
+    );
+
+    renderSupport();
+    expect(await screen.findByText('Open case')).not.toBeNull();
+    await waitFor(() => expect(screen.queryByText('How did we do?')).toBeNull());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Resolved · 2' }));
+    fireEvent.click(screen.getByText('Resolved case'));
+    expect(await screen.findByText('How did we do?')).not.toBeNull();
+
+    fireEvent.click(screen.getByText('Closed case'));
+    expect(await screen.findByText('How did we do?')).not.toBeNull();
+  });
+
   it('renders empty, list error, and missing case states', async () => {
     server.use(http.get(`${apiBase}/api/client/support/cases`, () => HttpResponse.json({ cases: [] })));
     const empty = renderSupport();
