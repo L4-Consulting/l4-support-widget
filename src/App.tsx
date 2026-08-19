@@ -53,6 +53,7 @@ function WidgetApp({ config: rawConfig, openSignal, shadowRoot, portalContainer 
       setHasUnread(false);
       return;
     }
+    if (open) return;
     let alive = true;
     let polling = false;
     let intervalId: number | undefined;
@@ -90,7 +91,7 @@ function WidgetApp({ config: rawConfig, openSignal, shadowRoot, portalContainer 
       stopPolling();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [api, config.launcher.enabled, config.tabs]);
+  }, [api, config.launcher.enabled, config.tabs, open]);
 
   function openPanel() {
     setOpen(true);
