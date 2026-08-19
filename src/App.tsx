@@ -18,7 +18,10 @@ import { TabStateContext, type OpenSupportOptions } from './tab-state';
 import { HelpTab } from './tabs/HelpTab';
 import { RoadmapTab } from './tabs/RoadmapTab';
 import { SupportTab } from './tabs/SupportTab';
+import { ApiClient } from './api/client';
 import vegaAvatarUrl from './assets/vega-profile-128.jpg';
+
+const UNREAD_POLL_MS = 20_000;
 
 export interface AppProps {
   config: L4SupportInit;
@@ -37,11 +40,57 @@ export function App(props: AppProps): JSX.Element {
 
 function WidgetApp({ config: rawConfig, openSignal, shadowRoot, portalContainer }: AppProps): JSX.Element {
   const config = useMemo(() => normalizeConfig(rawConfig), [rawConfig]);
+  const api = useMemo(() => new ApiClient(config), [config]);
   const [open, setOpen] = useState(false);
+  const [hasUnread, setHasUnread] = useState(false);
 
   useEffect(() => {
     if (openSignal > 0) setOpen(true);
   }, [openSignal]);
+
+  useEffect(() => {
+    if (!config.launcher.enabled || !config.tabs.includes('support')) {
+      setHasUnread(false);
+      return;
+    }
+    let alive = true;
+    let polling = false;
+    let intervalId: number | undefined;
+    const refreshUnread = () => {
+      if (polling) return;
+      polling = true;
+      api.listCases()
+        .then(({ cases }) => {
+          if (alive) setHasUnread(cases.some((supportCase) => supportCase.has_unanswered_customer_activity === true));
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          polling = false;
+        });
+    };
+    const stopPolling = () => {
+      if (intervalId !== undefined) window.clearInterval(intervalId);
+      intervalId = undefined;
+    };
+    const startPolling = () => {
+      stopPolling();
+      if (document.visibilityState !== 'visible') return;
+      refreshUnread();
+      intervalId = window.setInterval(refreshUnread, UNREAD_POLL_MS);
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') startPolling();
+      else stopPolling();
+    };
+
+    startPolling();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      alive = false;
+      stopPolling();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [api, config.launcher.enabled, config.tabs]);
 
   function openPanel() {
     setOpen(true);
@@ -61,7 +110,7 @@ function WidgetApp({ config: rawConfig, openSignal, shadowRoot, portalContainer 
         data-l4-theme={config.theme.mode}
         data-l4-app
       >
-        {config.launcher.enabled ? <Launcher config={config} onOpen={openPanel} /> : null}
+        {config.launcher.enabled ? <Launcher config={config} hasUnread={hasUnread} onOpen={openPanel} /> : null}
         {open ? (
           <PanelPortal config={config} shadowRoot={shadowRoot} portalContainer={portalContainer} onClose={closePanel} />
         ) : null}
@@ -70,7 +119,15 @@ function WidgetApp({ config: rawConfig, openSignal, shadowRoot, portalContainer 
   );
 }
 
-function Launcher({ config, onOpen }: { config: NormalizedConfig; onOpen: () => void }): JSX.Element {
+function Launcher({
+  config,
+  hasUnread,
+  onOpen,
+}: {
+  config: NormalizedConfig;
+  hasUnread: boolean;
+  onOpen: () => void;
+}): JSX.Element {
   const sideClass = config.launcher.position === 'bl' ? 'left-5' : 'right-5';
   return (
     <button
@@ -79,11 +136,12 @@ function Launcher({ config, onOpen }: { config: NormalizedConfig; onOpen: () => 
       data-l4-launcher
       data-avatar={config.launcher.avatar}
       onClick={onOpen}
-      aria-label={strings.launcherLabel}
+      aria-label={hasUnread ? strings.launcherUnreadLabel : strings.launcherLabel}
     >
       {config.launcher.avatar ? (
         <img className="l4-launcher-avatar" src={vegaAvatarUrl} alt="" data-l4-launcher-avatar />
       ) : strings.launcherText}
+      {hasUnread ? <span className="l4-launcher-unread" data-l4-launcher-unread aria-hidden="true" /> : null}
     </button>
   );
 }
