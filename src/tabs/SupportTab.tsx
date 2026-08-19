@@ -290,6 +290,7 @@ export function SupportTab(): JSX.Element {
               className="l4-case-filter"
               type="button"
               data-active={activeFilter === filter.group}
+              aria-pressed={activeFilter === filter.group}
               onClick={() => setActiveFilter(filter.group)}
             >
               {filter.label}{strings.separatorDot}{counts[filter.group]}
@@ -471,7 +472,13 @@ function TicketRow({
   const timestamp = supportCase.last_public_message_at ?? supportCase.updated_at ?? supportCase.created_at;
 
   return (
-    <button className="l4-ticket-row" type="button" data-selected={selected} onClick={() => onSelect(supportCase.id)}>
+    <button
+      className="l4-ticket-row"
+      type="button"
+      data-selected={selected}
+      aria-current={selected ? 'true' : undefined}
+      onClick={() => onSelect(supportCase.id)}
+    >
       <span className="l4-ticket-line">
         <span className="l4-case-id">{caseNumber(supportCase)}</span>
         <span className="l4-ticket-time">{relativeTime(timestamp)}</span>
@@ -479,7 +486,12 @@ function TicketRow({
       <span className="l4-ticket-subject">{supportCase.subject}</span>
       <span className="l4-ticket-line">
         <StatusPill status={supportCase.status} />
-        {supportCase.has_unanswered_customer_activity ? <span className="l4-unread-dot" /> : null}
+        {supportCase.has_unanswered_customer_activity ? (
+          <>
+            <span className="l4-unread-dot" aria-hidden="true" />
+            <span className="l4-sr-only">Unread customer activity</span>
+          </>
+        ) : null}
         {preview ? <span className="l4-ticket-preview">{preview}</span> : null}
       </span>
     </button>

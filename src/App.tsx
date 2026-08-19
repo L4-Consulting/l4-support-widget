@@ -8,6 +8,7 @@ import {
   type CSSProperties,
   type ErrorInfo,
   type JSX,
+  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from 'react';
 import { ConfigContext, emitEvent, normalizeConfig, type L4SupportInit, type NormalizedConfig } from './config';
@@ -132,6 +133,21 @@ function PanelPortal({
     [activeTab, openSupportWith, supportDraftSubject],
   );
 
+  function handleTabKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>, tab: 'help' | 'support' | 'roadmap') {
+    const currentIndex = activeTabs.indexOf(tab);
+    let nextIndex: number | null = null;
+    if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % activeTabs.length;
+    if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + activeTabs.length) % activeTabs.length;
+    if (event.key === 'Home') nextIndex = 0;
+    if (event.key === 'End') nextIndex = activeTabs.length - 1;
+    if (nextIndex === null) return;
+    event.preventDefault();
+    const nextTab = activeTabs[nextIndex];
+    setActiveTab(nextTab);
+    const tabs = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]');
+    tabs?.[nextIndex]?.focus();
+  }
+
   return (
     <ShadowPortal container={portalContainer}>
       <div
@@ -185,6 +201,7 @@ function PanelPortal({
                 aria-controls={`l4-panel-${tab}`}
                 tabIndex={activeTab === tab ? 0 : -1}
                 onClick={() => setActiveTab(tab)}
+                onKeyDown={(event) => handleTabKeyDown(event, tab)}
               >
                 {tabLabel(tab)}
               </button>
