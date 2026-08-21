@@ -29,6 +29,7 @@ describe('l4-support-widget custom element', () => {
     expect(text).toContain('Support');
     expect(el.shadowRoot?.querySelector('[data-l4-widget-root]')).not.toBeNull();
     expect(el.shadowRoot?.querySelector('[data-l4-portal-root]')).not.toBeNull();
+    expect(document.head.querySelector('link[href*="fonts.googleapis.com"]')).toBeNull();
   });
 
   it('stamps the version onto a data attribute', async () => {

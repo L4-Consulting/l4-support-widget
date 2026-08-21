@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { App } from './App';
 import type { L4SupportInit } from './config';
-import { injectDocumentFonts, injectWidgetStyles, type StyleInjectionMode } from './styles';
+import { injectWidgetStyles, type StyleInjectionMode } from './styles';
 import { getStoredTokenProvider } from './token-provider';
 import { version } from './version';
 
@@ -28,7 +28,6 @@ export class L4SupportElement extends HTMLElement {
     }
 
     const shadow = this.shadowRoot ?? this.attachShadow({ mode: 'open' });
-    injectDocumentFonts(document);
     const styleResult = injectWidgetStyles(shadow, {
       forceFallback: this.getAttribute('style-mode') === 'fallback',
     });

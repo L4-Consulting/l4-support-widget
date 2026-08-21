@@ -117,7 +117,7 @@ describe('public API', () => {
     await waitFor(() => {
       expect(document.querySelector(ELEMENT_NAME)?.shadowRoot?.querySelector('[data-l4-launcher]')).not.toBeNull();
     });
-    expect(document.head.querySelector('#l4-support-widget-fonts')).not.toBeNull();
+    expect(document.head.querySelector('link[href*="fonts.googleapis.com"]')).toBeNull();
 
     act(() => {
       destroy();
@@ -125,8 +125,9 @@ describe('public API', () => {
     });
 
     expect(document.querySelector(ELEMENT_NAME)).toBeNull();
-    expect(document.head.querySelector('#l4-support-widget-fonts')).toBeNull();
+    expect(document.head.querySelector('link[href*="fonts.googleapis.com"]')).toBeNull();
     expect(getConfig()).toBeNull();
+    expect(getTokenProvider()).toBeNull();
   });
 
   it('root error boundary renders fallback UI instead of crashing the host page', () => {

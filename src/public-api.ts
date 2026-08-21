@@ -1,7 +1,6 @@
 import { ELEMENT_NAME, registerElement } from './element';
 import { ConfigError, normalizeConfig, type L4SupportInit, type TokenProvider } from './config';
-import { removeDocumentFonts } from './styles';
-import { getStoredTokenProvider, setStoredTokenProvider } from './token-provider';
+import { clearStoredTokenProvider, getStoredTokenProvider, setStoredTokenProvider } from './token-provider';
 import { version } from './version';
 
 let lastConfig: L4SupportInit | null = null;
@@ -71,9 +70,10 @@ export function open(): void {
 }
 
 export function destroy(): void {
-  if (typeof document === 'undefined') return;
-  document.querySelectorAll(ELEMENT_NAME).forEach((el) => el.remove());
-  removeDocumentFonts(document);
+  if (typeof document !== 'undefined') {
+    document.querySelectorAll(ELEMENT_NAME).forEach((el) => el.remove());
+  }
+  clearStoredTokenProvider();
   lastConfig = null;
   lastError = null;
 }
