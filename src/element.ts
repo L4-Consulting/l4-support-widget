@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { App } from './App';
 import type { L4SupportInit } from './config';
-import { injectWidgetStyles, type StyleInjectionMode } from './styles';
+import { injectDocumentFonts, injectWidgetStyles, type StyleInjectionMode } from './styles';
 import { getStoredTokenProvider } from './token-provider';
 import { version } from './version';
 
@@ -28,8 +28,10 @@ export class L4SupportElement extends HTMLElement {
     }
 
     const shadow = this.shadowRoot ?? this.attachShadow({ mode: 'open' });
+    injectDocumentFonts(document, this.#config?.assetBase ?? this.getAttribute('asset-base') ?? undefined);
     const styleResult = injectWidgetStyles(shadow, {
       forceFallback: this.getAttribute('style-mode') === 'fallback',
+      assetBase: this.#config?.assetBase ?? this.getAttribute('asset-base') ?? undefined,
     });
 
     // Version diagnostics surfaced on the element (v2 plan §2, runtime-drift note).
@@ -90,9 +92,10 @@ export class L4SupportElement extends HTMLElement {
     const productKey = this.getAttribute('product-key');
     const productLabel = this.getAttribute('product-label') || undefined;
     const apiBase = this.getAttribute('api-base');
+    const assetBase = this.getAttribute('asset-base') || undefined;
     const getToken = getStoredTokenProvider() ?? undefined;
     if (!productKey || !apiBase || !getToken) return null;
-    return { productKey, productLabel, apiBase, getToken };
+    return { productKey, productLabel, apiBase, assetBase, getToken };
   }
 }
 
