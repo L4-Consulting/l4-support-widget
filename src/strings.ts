@@ -4,6 +4,7 @@ export const strings = {
   headerMark: 'L4',
   separatorDot: ' · ',
   launcherLabel: 'Open support',
+  launcherUnreadLabel: 'Open support, unread activity',
   launcherText: 'Support',
   closePanelGlyph: '×',
   closePanelLabel: 'Close support',

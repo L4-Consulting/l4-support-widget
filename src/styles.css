@@ -153,6 +153,18 @@
     height: 42px;
   }
 
+  .l4-launcher-unread {
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--l4-paper);
+    border-radius: 50%;
+    background: var(--l4-blue);
+    box-sizing: border-box;
+  }
+
   .l4-launcher.right-5 {
     right: 20px;
   }
