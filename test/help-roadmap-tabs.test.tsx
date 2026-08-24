@@ -205,6 +205,34 @@ describe('RoadmapTab', () => {
   });
 });
 
+describe('App tab keyboard navigation', () => {
+  it('activates and focuses tabs with arrows, Home, and End', async () => {
+    server.use(
+      http.get(`${apiBase}/api/client/support/cases`, () => HttpResponse.json({ cases: [] })),
+      http.get(`${apiBase}/api/client/roadmap`, () => HttpResponse.json({ items: [] })),
+    );
+    const host = document.createElement('div');
+    const shadowRoot = host.attachShadow({ mode: 'open' });
+    const portalContainer = document.createElement('div');
+    document.body.appendChild(portalContainer);
+    render(<App config={{ productKey: 'civickit', apiBase, getToken: () => 'tok' }} openSignal={1} shadowRoot={shadowRoot} portalContainer={portalContainer} />);
+
+    const supportTab = screen.getByRole('tab', { name: 'My Support' });
+    supportTab.focus();
+    fireEvent.keyDown(supportTab, { key: 'ArrowRight' });
+    const roadmapTab = screen.getByRole('tab', { name: 'Roadmap' });
+    expect(roadmapTab.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(roadmapTab);
+
+    fireEvent.keyDown(roadmapTab, { key: 'ArrowRight' });
+    expect(screen.getByRole('tab', { name: 'Help' }).getAttribute('aria-selected')).toBe('true');
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'Help' }), { key: 'End' });
+    expect(screen.getByRole('tab', { name: 'Roadmap' }).getAttribute('aria-selected')).toBe('true');
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'Roadmap' }), { key: 'Home' });
+    expect(screen.getByRole('tab', { name: 'Help' }).getAttribute('aria-selected')).toBe('true');
+  });
+});
+
 function roadmapItem(id: string, title: string, status: string, quarter: string) {
   return {
     id,

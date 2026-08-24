@@ -48,6 +48,21 @@ async function openPanel(page: Page) {
   });
 }
 
+function contrastRatio(foreground: string, background: string): number {
+  const luminance = (color: string) => {
+    const channels = color.match(/\d+/g)?.slice(0, 3).map(Number) ?? [];
+    if (channels.length !== 3) throw new Error(`Unsupported color: ${color}`);
+    const [red, green, blue] = channels.map((channel) => {
+      const value = channel / 255;
+      return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+  };
+  const lighter = Math.max(luminance(foreground), luminance(background));
+  const darker = Math.min(luminance(foreground), luminance(background));
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
 test('widget CSS is compiled and injected via adoptedStyleSheets, with a style fallback path', async ({
   page,
 }) => {
@@ -113,6 +128,7 @@ test('style isolation works in both directions across the shadow boundary', asyn
       hostProbeRadius: hostProbeStyle.borderRadius,
       hostButtonColor: hostButtonStyle.color,
       widgetButtonColor: widgetButtonStyle.color,
+      widgetButtonBackground: widgetButtonStyle.backgroundColor,
       widgetButtonBorderColor: widgetButtonStyle.borderTopColor,
     };
   });
@@ -121,7 +137,8 @@ test('style isolation works in both directions across the shadow boundary', asyn
   expect(isolation.hostProbePadding).toBe('0px');
   expect(isolation.hostProbeRadius).toBe('0px');
   expect(isolation.hostButtonColor).toBe('rgb(127, 29, 29)');
-  expect(isolation.widgetButtonColor).toBe('rgb(255, 255, 255)');
+  expect(isolation.widgetButtonColor).toBe('rgb(5, 46, 36)');
+  expect(contrastRatio(isolation.widgetButtonColor, isolation.widgetButtonBackground)).toBeGreaterThanOrEqual(4.5);
   expect(isolation.widgetButtonBorderColor).not.toBe('rgb(127, 29, 29)');
 });
 
@@ -164,6 +181,7 @@ test('operator console geometry and design tokens are applied inside the panel',
       listWidth: Math.round(list.getBoundingClientRect().width),
       listBackground: listStyle.backgroundColor,
       markColor: markStyle.color,
+      accentContrastToken: markStyle.getPropertyValue('--l4-accent-contrast').trim(),
       titleFont: titleStyle.fontFamily,
       titleSize: titleStyle.fontSize,
     };
@@ -175,7 +193,8 @@ test('operator console geometry and design tokens are applied inside the panel',
   expect(design.panelBackground).toBe('rgb(255, 255, 255)');
   expect(design.listWidth).toBe(340);
   expect(design.listBackground).toBe('rgb(250, 251, 252)');
-  expect(design.markColor).toBe('rgb(255, 255, 255)');
+  expect(design.markColor).toBe('rgb(5, 46, 36)');
+  expect(design.accentContrastToken).toBe('#052e24');
   expect(design.titleFont).toContain('IBM Plex Sans');
   expect(design.titleSize).toBe('15.2px');
 });

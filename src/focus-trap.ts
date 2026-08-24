@@ -26,6 +26,7 @@ export function createShadowFocusTrap(
   options: { onEscape?: () => void } = {},
 ): ShadowFocusTrap {
   let active = false;
+  let restoreTarget: HTMLElement | null = null;
 
   const focusFirst = () => {
     const first = visibleFocusables(container)[0] ?? container;
@@ -72,6 +73,7 @@ export function createShadowFocusTrap(
     activate() {
       if (active) return;
       active = true;
+      restoreTarget = shadowRoot.activeElement instanceof HTMLElement ? shadowRoot.activeElement : null;
       shadowRoot.addEventListener('keydown', onKeyDown);
       queueMicrotask(focusFirst);
     },
@@ -79,6 +81,8 @@ export function createShadowFocusTrap(
       if (!active) return;
       active = false;
       shadowRoot.removeEventListener('keydown', onKeyDown);
+      if (restoreTarget?.isConnected) restoreTarget.focus();
+      restoreTarget = null;
     },
   };
 }

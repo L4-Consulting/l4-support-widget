@@ -155,7 +155,10 @@ describe('SupportTab', () => {
       http.get(`${apiBase}/api/client/support/cases`, () =>
         HttpResponse.json({
           cases: [
-            supportCase('case-1', 'Import failure', 'CASE-2026-01184', 'triaging', 'Vega traced the CSV row issue.'),
+            {
+              ...supportCase('case-1', 'Import failure', 'CASE-2026-01184', 'triaging', 'Vega traced the CSV row issue.'),
+              has_unanswered_customer_activity: true,
+            },
             supportCase('case-2', 'Roster update', 'CASE-2026-01179', 'waiting_on_customer', 'We need the final list.'),
             supportCase('case-3', 'Payout timing', 'CASE-2026-01158', 'resolved', 'Answered instantly.'),
           ],
@@ -217,7 +220,10 @@ describe('SupportTab', () => {
 
     expect((await screen.findAllByText('Import failure')).length).toBeGreaterThan(0);
     expect(screen.getAllByText('In progress').length).toBeGreaterThan(0);
-    fireEvent.click(screen.getByRole('button', { name: 'Waiting on you · 1' }));
+    const waitingFilter = screen.getByRole('button', { name: 'Waiting on you · 1' });
+    expect(screen.getByRole('button', { name: 'Open · 1' }).getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(waitingFilter);
+    expect(waitingFilter.getAttribute('aria-pressed')).toBe('true');
     const list = document.querySelector('[data-l4-cases-list]');
     if (!list) throw new Error('missing cases list');
     expect(within(list as HTMLElement).getByText('Roster update')).not.toBeNull();
@@ -230,6 +236,9 @@ describe('SupportTab', () => {
     expect(answerLink.getAttribute('rel')).toBe('noopener noreferrer');
     expect(docsCalls).toBe(1);
     expect(within(list as HTMLElement).getByText('Import failure')).not.toBeNull();
+    const selectedTicket = within(list as HTMLElement).getByRole('button', { name: /Import failure/ });
+    expect(selectedTicket.getAttribute('aria-current')).toBe('true');
+    expect(within(selectedTicket).getByText('Unread customer activity')).not.toBeNull();
     expect(within(list as HTMLElement).queryByText('Roster update')).toBeNull();
     fireEvent.click(screen.getAllByText('Import failure')[0]);
 
