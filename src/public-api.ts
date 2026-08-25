@@ -1,7 +1,7 @@
 import { ELEMENT_NAME, registerElement } from './element';
-import { ConfigError, normalizeConfig, type L4SupportInit, type TokenProvider } from './config';
+import { ConfigError, normalizeConfig, type L4SupportInit, type NormalizedConfig, type TokenProvider } from './config';
+import { clearStoredTokenProvider, getStoredTokenProvider, setStoredTokenProvider } from './token-provider';
 import { removeDocumentFonts } from './styles';
-import { getStoredTokenProvider, setStoredTokenProvider } from './token-provider';
 import { version } from './version';
 
 let lastConfig: L4SupportInit | null = null;
@@ -23,8 +23,10 @@ export function getTokenProvider(): TokenProvider | null {
  * config. This is the ONLY place the ESM entry may trigger element registration.
  */
 export function init(opts: L4SupportInit): void {
+  const fallbackTokenProvider = getStoredTokenProvider();
+  let normalized: NormalizedConfig;
   try {
-    normalizeConfig(opts, getStoredTokenProvider());
+    normalized = normalizeConfig(opts, fallbackTokenProvider);
     lastError = null;
   } catch (error) {
     lastError = error instanceof ConfigError ? error : new ConfigError('L4Support.init received invalid configuration.');
@@ -37,8 +39,13 @@ export function init(opts: L4SupportInit): void {
 
   if (typeof document === 'undefined') return;
 
-  lastConfig = opts;
   if (opts.getToken) setStoredTokenProvider(opts.getToken);
+  const effectiveConfig: L4SupportInit = {
+    ...opts,
+    assetBase: normalized.assetBase,
+    getToken: normalized.getToken,
+  };
+  lastConfig = effectiveConfig;
 
   let el = document.querySelector(ELEMENT_NAME) as (HTMLElement & {
     configure?: (nextConfig: L4SupportInit) => void;
@@ -47,12 +54,15 @@ export function init(opts: L4SupportInit): void {
     el = document.createElement(ELEMENT_NAME);
     el.setAttribute('product-key', opts.productKey);
     el.setAttribute('api-base', opts.apiBase);
-    el.configure?.(opts);
+    if (effectiveConfig.assetBase) el.setAttribute('asset-base', effectiveConfig.assetBase);
+    el.configure?.(effectiveConfig);
     document.body.appendChild(el);
   } else {
     el.setAttribute('product-key', opts.productKey);
     el.setAttribute('api-base', opts.apiBase);
-    el.configure?.(opts);
+    if (effectiveConfig.assetBase) el.setAttribute('asset-base', effectiveConfig.assetBase);
+    else el.removeAttribute('asset-base');
+    el.configure?.(effectiveConfig);
   }
 }
 
@@ -71,9 +81,11 @@ export function open(): void {
 }
 
 export function destroy(): void {
-  if (typeof document === 'undefined') return;
-  document.querySelectorAll(ELEMENT_NAME).forEach((el) => el.remove());
-  removeDocumentFonts(document);
+  if (typeof document !== 'undefined') {
+    document.querySelectorAll(ELEMENT_NAME).forEach((el) => el.remove());
+    removeDocumentFonts(document);
+  }
+  clearStoredTokenProvider();
   lastConfig = null;
   lastError = null;
 }

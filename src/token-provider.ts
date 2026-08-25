@@ -9,3 +9,7 @@ export function setStoredTokenProvider(fn: TokenProvider): void {
 export function getStoredTokenProvider(): TokenProvider | null {
   return tokenProvider;
 }
+
+export function clearStoredTokenProvider(): void {
+  tokenProvider = null;
+}

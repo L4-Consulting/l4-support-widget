@@ -278,23 +278,24 @@ test('shadow-aware focus trap cycles inside the panel and Escape closes it', asy
   await expect.poll(() => shadowEval(page, (root) => Boolean(root.querySelector('[data-l4-panel]')))).toBe(false);
 });
 
-test('document-head font face loads and applies inside the shadow-rendered widget', async ({ page }) => {
+test('script-relative self-hosted font loads and applies inside the shadow-rendered widget', async ({ page }) => {
   await waitForWidget(page);
 
-  const font = await page.evaluate(() => {
-    const fontLink = document.head.querySelector<HTMLLinkElement>('#l4-support-widget-fonts');
+  const font = await page.evaluate(async () => {
+    const loadedFaces = await document.fonts.load('400 16px "IBM Plex Sans"');
     const root = document.querySelector('l4-support-widget')?.shadowRoot;
     const launcher = root?.querySelector<HTMLElement>('[data-l4-launcher]');
     if (!launcher) throw new Error('missing launcher');
     return {
-      hasHeadFontLink: Boolean(fontLink),
-      fontHref: fontLink?.href,
+      hasThirdPartyFontLink: Boolean(document.head.querySelector('link[href*="fonts.googleapis.com"]')),
+      assetBase: root?.host.getAttribute('asset-base'),
+      loadedFaceCount: loadedFaces.length,
       widgetFontFamily: getComputedStyle(launcher).fontFamily,
     };
   });
 
-  expect(font.hasHeadFontLink).toBe(true);
-  expect(font.fontHref).toContain('IBM+Plex+Sans');
-  expect(font.fontHref).toContain('IBM+Plex+Mono');
+  expect(font.hasThirdPartyFontLink).toBe(false);
+  expect(font.assetBase).toBe('http://localhost:4173/dist/');
+  expect(font.loadedFaceCount).toBeGreaterThan(0);
   expect(font.widgetFontFamily).toContain('IBM Plex Sans');
 });

@@ -19,6 +19,8 @@ export interface L4SupportInit {
   productLabel?: string;
   /** API origin, e.g. "https://api.l4consulting.net". */
   apiBase: string;
+  /** Origin/path that serves widget assets. Standalone embeds infer this from their script URL. */
+  assetBase?: string;
   /** Host supplies the caller's JWT. */
   getToken?: TokenProvider;
   /** Which tabs to enable. Default: Help / My Support / Roadmap, with Support selected first. */
@@ -48,6 +50,7 @@ export interface NormalizedConfig {
   productKey: string;
   productLabel: string;
   apiBase: string;
+  assetBase?: string;
   getToken: TokenProvider;
   tabs: SupportTabId[];
   theme: {
@@ -97,6 +100,15 @@ function normalizeApiBase(apiBase: string): string {
   }
 }
 
+function normalizeAssetBase(assetBase: string | undefined): string | undefined {
+  if (!assetBase) return undefined;
+  try {
+    return new URL(assetBase, typeof document === 'undefined' ? undefined : document.baseURI).toString().replace(/\/?$/, '/');
+  } catch {
+    throw new ConfigError(`L4Support.init received an invalid assetBase: ${assetBase}`);
+  }
+}
+
 function normalizeTabs(tabs: L4SupportInit['tabs']): SupportTabId[] {
   if (!tabs) return DEFAULT_TABS;
   const unique = tabs.filter((tab, index) => tabs.indexOf(tab) === index);
@@ -108,6 +120,7 @@ export function normalizeConfig(opts: L4SupportInit, fallbackTokenProvider?: Tok
   const productKey = requireString(opts.productKey, 'productKey');
   const productLabel = typeof opts.productLabel === 'string' && opts.productLabel.trim() ? opts.productLabel.trim() : productKey;
   const apiBase = normalizeApiBase(requireString(opts.apiBase, 'apiBase'));
+  const assetBase = normalizeAssetBase(opts.assetBase);
   const getToken = opts.getToken ?? fallbackTokenProvider;
 
   if (typeof getToken !== 'function') {
@@ -126,6 +139,7 @@ export function normalizeConfig(opts: L4SupportInit, fallbackTokenProvider?: Tok
     productKey,
     productLabel,
     apiBase,
+    assetBase,
     getToken,
     tabs: normalizeTabs(opts.tabs),
     theme: { accent, mode },

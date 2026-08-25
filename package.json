@@ -46,15 +46,13 @@
   "overrides": {
     "vite": "6.4.3"
   },
-  "dependencies": {
-    "react": "^19.0.0 || ^18.0.0",
-    "react-dom": "^19.0.0 || ^18.0.0"
-  },
   "peerDependencies": {
     "react": "^19.0.0 || ^18.0.0",
     "react-dom": "^19.0.0 || ^18.0.0"
   },
   "devDependencies": {
+    "@fontsource/ibm-plex-mono": "^5.2.7",
+    "@fontsource/ibm-plex-sans": "^5.2.7",
     "@eslint/js": "^9.18.0",
     "@playwright/test": "^1.49.1",
     "@tailwindcss/vite": "^4.3.2",
@@ -72,6 +70,8 @@
     "http-server": "^14.1.1",
     "jsdom": "^25.0.1",
     "msw": "^2.7.0",
+    "react": "^19.0.0 || ^18.0.0",
+    "react-dom": "^19.0.0 || ^18.0.0",
     "tailwindcss": "^4.3.2",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0",

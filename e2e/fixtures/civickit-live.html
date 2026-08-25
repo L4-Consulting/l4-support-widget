@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CivicKit support embed</title>
+  </head>
+  <body>
+    <script src="/releases/widget/v1/l4-support-widget.js"></script>
+    <script>
+      L4Support.setTokenProvider(() => 'civickit-live-token');
+      L4Support.init({
+        productKey: 'civickit',
+        apiBase: 'https://api.l4consulting.net',
+      });
+    </script>
+  </body>
+</html>

@@ -38,6 +38,8 @@ export default defineConfig(({ mode }) => {
         ...VERSION_DEFINE,
       },
       build: {
+        // Copy the self-hosted public font assets beside the standalone build.
+        // The widget must never make a third-party font request on its host's behalf.
         emptyOutDir: true,
         lib: {
           entry: resolve(__dirname, 'src/global.ts'),
