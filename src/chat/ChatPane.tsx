@@ -10,10 +10,17 @@ import {
 } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { ApiClient } from '../api/client';
-import type { CaseDetail } from '../api/types';
-import type { NormalizedConfig } from '../config';
+import type { CaseCsat, CaseDetail } from '../api/types';
+import { emitNarration, type NormalizedConfig } from '../config';
+import { strings } from '../strings';
+import {
+  CaseThreadHeader,
+  CaseThreadStream,
+  showCsatForCase,
+} from '../support/case-thread';
+import { CsatPanel } from '../tabs/CsatPanel';
+import { injectChatStyles, releaseChatStyles } from './chat-styles';
 import { ensureStreamAuthContext, resetStreamAuthContext, runCaseStream, streamAuthKey } from './stream';
-import chatScopedCss from './chat-scoped.css?inline';
 
 const POLL_MS = 20_000;
 const REFETCH_COALESCE_MS = 400;
@@ -23,15 +30,6 @@ export interface ChatPaneProps {
   config: NormalizedConfig;
   caseId: string | null;
   onLivePausedChange?: (paused: boolean) => void;
-}
-
-function injectScopedStyles(container: HTMLElement): void {
-  const marker = 'data-l4-chat-style';
-  if (container.querySelector(`[${marker}]`)) return;
-  const style = document.createElement('style');
-  style.setAttribute(marker, '');
-  style.textContent = chatScopedCss;
-  container.prepend(style);
 }
 
 export function ChatPane({ config, caseId, onLivePausedChange, container }: ChatPaneProps): JSX.Element {
@@ -49,9 +47,17 @@ export function ChatPane({ config, caseId, onLivePausedChange, container }: Chat
   const detailRequestRef = useRef(0);
   const sendInflightRef = useRef(false);
   const streamLiveRef = useRef(false);
+  const narratedMessageIds = useRef(new Set<string>());
+  const narrationAuthKeyRef = useRef<string | null>(null);
+  const csatSubmitCaseRef = useRef<string | null>(null);
+  const onNarrateRef = useRef(config.onNarrate);
+  onNarrateRef.current = config.onNarrate;
 
   useEffect(() => {
-    injectScopedStyles(container);
+    injectChatStyles(container);
+    return () => {
+      releaseChatStyles(container);
+    };
   }, [container]);
 
   const refreshDetail = useCallback(
@@ -104,9 +110,28 @@ export function ChatPane({ config, caseId, onLivePausedChange, container }: Chat
     onLivePausedChange?.(livePaused);
   }, [livePaused, onLivePausedChange]);
 
+  useEffect(() => {
+    if (!config.voice.enabled || !onNarrateRef.current || !detail) return;
+    for (const message of detail.messages) {
+      if (message.author_type !== 'agent' || narratedMessageIds.current.has(message.id)) continue;
+      narratedMessageIds.current.add(message.id);
+      emitNarration({ onNarrate: onNarrateRef.current }, {
+        id: message.id,
+        body: message.body,
+        author_type: 'agent',
+        author_name: message.author_name,
+        created_at: message.created_at,
+      });
+    }
+  }, [config.voice.enabled, detail]);
+
   useLayoutEffect(() => {
     const authKey = streamAuthKey(config.apiBase, config.productKey, config.getToken);
     ensureStreamAuthContext(authKey);
+    if (narrationAuthKeyRef.current !== authKey) {
+      narrationAuthKeyRef.current = authKey;
+      narratedMessageIds.current = new Set();
+    }
 
     const life = ++lifecycleRef.current;
     streamAbort.current?.abort();
@@ -122,6 +147,7 @@ export function ChatPane({ config, caseId, onLivePausedChange, container }: Chat
     setLoadError('');
     setDetail(null);
     setComposerKey((k) => k + 1);
+    csatSubmitCaseRef.current = caseId;
 
     if (!caseId) {
       return;
@@ -202,6 +228,14 @@ export function ChatPane({ config, caseId, onLivePausedChange, container }: Chat
     stopPoll,
   ]);
 
+  const handleCsatSubmitted = useCallback(
+    (csat: CaseCsat) => {
+      if (csatSubmitCaseRef.current !== caseId) return;
+      setDetail((current) => (current ? { ...current, csat } : current));
+    },
+    [caseId],
+  );
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (!caseId || sendPending || sendInflightRef.current) return;
@@ -229,38 +263,46 @@ export function ChatPane({ config, caseId, onLivePausedChange, container }: Chat
   }
 
   if (!caseId) {
-    return <p role="status">Select a case to open the conversation.</p>;
+    return <p role="status">{strings.selectCase}</p>;
   }
   if (loadError) {
     return <p role="alert">{loadError}</p>;
   }
-
-  const messages = detail?.messages ?? [];
+  if (!detail) {
+    return <p className="l4-state-message" role="status" data-l4-state="loading">{strings.caseLoading}</p>;
+  }
 
   return (
     <div data-l4-chat-pane aria-live="polite">
       {livePaused ? <div className="l4-chat-live-paused">Live updates paused</div> : null}
-      <div className="l4-chat-stream" data-l4-chat-messages>
-        {messages.map((message) => {
-          const customer = message.author_type === 'client' || message.author_type === 'customer';
-          return (
-            <div
-              key={message.id}
-              className="l4-chat-bubble"
-              data-side={customer ? 'customer' : 'l4'}
-            >
-              {message.body}
-            </div>
-          );
-        })}
-      </div>
-      <form key={composerKey} className="l4-chat-composer" onSubmit={handleSubmit}>
-        <label className="l4-chat-reply-label">
-          <span className="l4-chat-sr-only">Reply</span>
-          <textarea name="body" placeholder="Write a reply…" aria-label="Reply" disabled={sendPending} />
+      <CaseThreadHeader detail={detail} />
+      <CaseThreadStream detail={detail} config={config} />
+      {showCsatForCase(detail) ? (
+        <CsatPanel
+          key={detail.case.id}
+          api={api}
+          caseId={detail.case.id}
+          initialCsat={detail.csat ?? null}
+          onSubmitted={handleCsatSubmitted}
+        />
+      ) : null}
+      <form key={composerKey} className="l4-composer" onSubmit={handleSubmit}>
+        <label className="l4-reply-label">
+          <span>{strings.replyLabel}</span>
+          <textarea
+            className="l4-reply-box"
+            name="body"
+            placeholder={strings.replyPlaceholder}
+            aria-label={strings.replyLabel}
+            disabled={sendPending}
+          />
         </label>
-        {replyError ? <p role="alert">{replyError}</p> : null}
-        <button type="submit" disabled={sendPending}>Send</button>
+        {replyError ? <p className="l4-form-error" role="alert">{replyError}</p> : null}
+        <div className="l4-composer-actions">
+          <button className="l4-send-button" type="submit" disabled={sendPending}>
+            {strings.replyButton}
+          </button>
+        </div>
       </form>
     </div>
   );
@@ -296,6 +338,7 @@ export function mountChatPane(props: ChatPaneProps): void {
 }
 
 export function unmountChatPane(): void {
+  if (mountedContainer) releaseChatStyles(mountedContainer);
   mountRoot?.unmount();
   mountRoot = null;
   mountedContainer = null;

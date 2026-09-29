@@ -74,7 +74,7 @@ test.describe('chat loader via built global widget (two origins)', () => {
         if (!textarea) return null;
         return getComputedStyle(textarea).borderRadius;
       });
-      expect(textareaRadius).toBe('8px');
+      expect(textareaRadius).toBe('10px');
       const pageErrors = await page.evaluate(() => (window as Window & { __l4ConsoleErrors?: string[] }).__l4ConsoleErrors ?? []);
       expect(pageErrors).toEqual([]);
     } finally {
@@ -255,6 +255,42 @@ test.describe('chat loader CSP (same-origin enforcement)', () => {
       expect(state.violations.some((uri) => uri.includes('l4-support-widget-chat.js'))).toBe(true);
       expect(state.runtime).toBe(false);
       expect(state.chatMount).toBe(false);
+    } finally {
+      server.close();
+    }
+  });
+});
+
+test.describe('chat strict style-src (no unsafe-inline)', () => {
+  test.beforeAll(() => {
+    if (!existsSync(globalPath) || !existsSync(chatPath)) {
+      throw new Error('Run npm run build:release before e2e chat tests.');
+    }
+  });
+
+  test('chat composer keeps rounded corners under style-src without unsafe-inline', async ({ page }) => {
+    const port = 5315;
+    const server = serveFiles(port, false, {
+      '/': resolve(root, 'e2e/fixtures/chat-widget-host-strict-style-csp.html'),
+      '/l4-support-widget.js': globalPath,
+      '/l4-support-widget-chat.js': chatPath,
+    });
+    try {
+      await mockSupportApi(page);
+      await page.goto(`http://127.0.0.1:${port}/`);
+      await page.waitForFunction(() => Boolean((window as Window & { L4SupportChat?: unknown }).L4SupportChat));
+      await expect(page.locator('l4-support-widget [data-l4-chat-mount] textarea')).toBeVisible();
+      const textareaRadius = await page.evaluate(() => {
+        const host = document.querySelector('l4-support-widget');
+        const chatMount = host?.shadowRoot?.querySelector('[data-l4-chat-mount]');
+        const textarea = chatMount?.querySelector('textarea');
+        if (!textarea) return null;
+        return getComputedStyle(textarea).borderRadius;
+      });
+      expect(textareaRadius).toBe('10px');
+      const pageErrors = await page.evaluate(() => (window as Window & { __l4ConsoleErrors?: string[] }).__l4ConsoleErrors ?? []);
+      expect(pageErrors).toEqual([]);
+      expect(await page.evaluate(() => (window as Window & { __l4StyleViolations?: string[] }).__l4StyleViolations ?? [])).toEqual([]);
     } finally {
       server.close();
     }

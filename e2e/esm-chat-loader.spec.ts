@@ -106,7 +106,7 @@ test.describe('ESM package host with explicit chat.assetUrl', () => {
       });
       expect(state.currentScriptAtEval).toBe('null');
       expect(state.loadedGlobalIife).toBe(false);
-      expect(state.textareaRadius).toBe('8px');
+      expect(state.textareaRadius).toBe('10px');
       expect(state.pageErrors).toEqual([]);
     } finally {
       host.close();

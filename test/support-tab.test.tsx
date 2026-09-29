@@ -109,8 +109,7 @@ describe('SupportTab', () => {
     );
 
     renderSupport();
-    expect(await screen.findByText('Need help')).not.toBeNull();
-    fireEvent.click(screen.getByText('Need help'));
+    fireEvent.click(await screen.findByRole('button', { name: /Need help/ }));
     expect(await screen.findByText('Initial message')).not.toBeNull();
     fireEvent.change(screen.getByLabelText('Reply'), { target: { value: 'Thanks for the update' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send' }));

@@ -23,6 +23,11 @@ export interface CaseStreamOptions {
 const MAX_AUTH_REFRESH_ATTEMPTS = 2;
 const MAX_DEDUPE_ENTRIES = 1000;
 
+/** Max wait for response headers after starting fetch (header-only hang). */
+export const CONNECT_HEADER_TIMEOUT_MS = 30_000;
+/** Max silence on the body before treating the stream as stalled (heartbeats count as activity). */
+export const IDLE_READ_TIMEOUT_MS = 30_000;
+
 const CLIENT_FORWARDED_EVENT_TYPES = new Set(['message', 'status']);
 
 class BoundedDedupe {
@@ -153,10 +158,54 @@ function findLineEnd(
   return null;
 }
 
-function backoffMs(attempt: number): number {
+/** @internal */
+export function backoffMs(attempt: number): number {
   const exp = Math.min(30_000, 1000 * 2 ** attempt);
   const jitter = Math.random() * Math.min(1000, Math.max(0, 30_000 - exp));
   return Math.min(30_000, Math.max(1_000, exp + jitter));
+}
+
+function linkParentAbort(parent: AbortSignal, child: AbortController): () => void {
+  if (parent.aborted) {
+    child.abort();
+    return () => undefined;
+  }
+  const onAbort = (): void => {
+    child.abort();
+  };
+  parent.addEventListener('abort', onAbort);
+  return () => parent.removeEventListener('abort', onAbort);
+}
+
+async function resolveToken(
+  getToken: CaseStreamOptions['getToken'],
+  signal: AbortSignal,
+): Promise<string | null> {
+  if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+  return new Promise<string | null>((resolve, reject) => {
+    const onAbort = (): void => {
+      cleanup();
+      reject(new DOMException('Aborted', 'AbortError'));
+    };
+    const cleanup = (): void => {
+      signal.removeEventListener('abort', onAbort);
+    };
+    signal.addEventListener('abort', onAbort);
+    void Promise.resolve().then(getToken).then(
+      (value) => {
+        cleanup();
+        if (signal.aborted) {
+          reject(new DOMException('Aborted', 'AbortError'));
+          return;
+        }
+        resolve(value);
+      },
+      (error: unknown) => {
+        cleanup();
+        reject(error);
+      },
+    );
+  });
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -223,17 +272,40 @@ export async function runCaseStream(opts: CaseStreamOptions): Promise<void> {
   let authRefreshAttempts = 0;
 
   while (!opts.signal.aborted) {
+    const attemptAbort = new AbortController();
+    const unlinkParent = linkParentAbort(opts.signal, attemptAbort);
+    let connectTimeoutId: number | undefined = window.setTimeout(() => {
+      attemptAbort.abort();
+    }, CONNECT_HEADER_TIMEOUT_MS);
+
+    const clearConnectTimeout = (): void => {
+      if (connectTimeoutId !== undefined) {
+        window.clearTimeout(connectTimeoutId);
+        connectTimeoutId = undefined;
+      }
+    };
+
+    const endAttempt = (): void => {
+      clearConnectTimeout();
+      unlinkParent();
+    };
+
     let token: string | null;
     try {
-      token = await opts.getToken();
-    } catch {
-      if (opts.signal.aborted) return;
+      token = await resolveToken(opts.getToken, opts.signal);
+    } catch (error) {
+      endAttempt();
+      if (opts.signal.aborted || (error instanceof DOMException && error.name === 'AbortError')) return;
       opts.handlers.onError?.('token_provider');
       return;
     }
-    if (opts.signal.aborted) return;
+    if (opts.signal.aborted) {
+      endAttempt();
+      return;
+    }
 
     if (!token) {
+      endAttempt();
       opts.handlers.onError?.('missing_token');
       return;
     }
@@ -246,23 +318,31 @@ export async function runCaseStream(opts: CaseStreamOptions): Promise<void> {
     if (cursor) headers['Last-Event-ID'] = cursor;
 
     let response: Response;
+    let connectTimedOut = false;
     try {
       response = await fetch(
         `${opts.apiBase}/api/client/support/cases/${encodeURIComponent(opts.caseId)}/stream`,
-        { headers, signal: opts.signal, credentials: 'omit' },
+        { headers, signal: attemptAbort.signal, credentials: 'omit' },
       );
     } catch {
+      connectTimedOut = attemptAbort.signal.aborted && !opts.signal.aborted;
+      endAttempt();
       if (opts.signal.aborted) return;
-      opts.handlers.onError?.('network');
+      opts.handlers.onError?.(connectTimedOut ? 'connect_timeout' : 'network');
       await sleep(backoffMs(attempt++), opts.signal);
       continue;
     }
-    if (opts.signal.aborted) return;
+    clearConnectTimeout();
+    if (opts.signal.aborted) {
+      endAttempt();
+      return;
+    }
 
     if (response.status === 401) {
       authRefreshAttempts += 1;
       cursor = applyCursor(null, caseState, opts, opts.signal);
       caseState.dedupe = new BoundedDedupe();
+      endAttempt();
       if (authRefreshAttempts > MAX_AUTH_REFRESH_ATTEMPTS) {
         opts.handlers.onError?.('auth');
         return;
@@ -274,6 +354,7 @@ export async function runCaseStream(opts: CaseStreamOptions): Promise<void> {
 
     if (response.status === 400) {
       const body = await readErrorSnippet(response, opts.signal);
+      endAttempt();
       if (opts.signal.aborted) return;
       if (cursor !== null && !invalidCursorResyncUsed && isInvalidCursorResponse(400, body)) {
         cursor = applyCursor(null, caseState, opts, opts.signal);
@@ -286,6 +367,7 @@ export async function runCaseStream(opts: CaseStreamOptions): Promise<void> {
     }
 
     if (!response.ok || !response.body) {
+      endAttempt();
       opts.handlers.onError?.(`http_${response.status}`);
       await sleep(backoffMs(attempt++), opts.signal);
       continue;
@@ -293,29 +375,59 @@ export async function runCaseStream(opts: CaseStreamOptions): Promise<void> {
 
     if (!isEventStreamContentType(response.headers.get('Content-Type'))) {
       await cancelResponseBody(response.body);
+      endAttempt();
       if (opts.signal.aborted) return;
       opts.handlers.onError?.('invalid_content_type');
       await sleep(backoffMs(attempt++), opts.signal);
       continue;
     }
 
-    attempt = 0;
-    authRefreshAttempts = 0;
-    if (opts.signal.aborted) return;
+    if (opts.signal.aborted) {
+      endAttempt();
+      return;
+    }
     opts.handlers.onOpen?.();
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    let healthyProgress = false;
+    let idleTimeoutId: number | undefined;
 
+    const clearIdleWatchdog = (): void => {
+      if (idleTimeoutId !== undefined) {
+        window.clearTimeout(idleTimeoutId);
+        idleTimeoutId = undefined;
+      }
+    };
+
+    const bumpIdleWatchdog = (): void => {
+      clearIdleWatchdog();
+      idleTimeoutId = window.setTimeout(() => {
+        attemptAbort.abort();
+      }, IDLE_READ_TIMEOUT_MS);
+    };
+
+    const markHealthyProgress = (): void => {
+      if (healthyProgress) return;
+      healthyProgress = true;
+      attempt = 0;
+      authRefreshAttempts = 0;
+    };
+
+    let readFailed = false;
     try {
-      while (!opts.signal.aborted) {
+      bumpIdleWatchdog();
+      while (!opts.signal.aborted && !attemptAbort.signal.aborted) {
         const { done, value } = await reader.read();
-        if (opts.signal.aborted) break;
+        if (opts.signal.aborted || attemptAbort.signal.aborted) break;
         if (done) break;
+        if (!value?.length) continue;
+        bumpIdleWatchdog();
         buffer += decoder.decode(value, { stream: true });
         const parsed = parseSseChunk(buffer);
         buffer = parsed.rest;
+        if (parsed.events.length > 0) markHealthyProgress();
         for (const frame of parsed.events) {
           if (opts.signal.aborted) break;
           if (frame.id) {
@@ -343,8 +455,16 @@ export async function runCaseStream(opts: CaseStreamOptions): Promise<void> {
         }
       }
     } catch {
-      if (!opts.signal.aborted) opts.handlers.onError?.('stream_read');
+      readFailed = true;
+      if (opts.signal.aborted) {
+        // parent cancelled — no error surface
+      } else if (attemptAbort.signal.aborted) {
+        opts.handlers.onError?.('idle_timeout');
+      } else {
+        opts.handlers.onError?.('stream_read');
+      }
     } finally {
+      clearIdleWatchdog();
       try {
         reader.cancel().catch(() => undefined);
       } catch {
@@ -353,8 +473,14 @@ export async function runCaseStream(opts: CaseStreamOptions): Promise<void> {
       reader.releaseLock();
     }
 
+    const idleTimedOut = attemptAbort.signal.aborted && !opts.signal.aborted;
+    endAttempt();
+
     if (opts.signal.aborted) return;
-    opts.handlers.onError?.('eof_paused');
+    if (!readFailed) {
+      if (idleTimedOut) opts.handlers.onError?.('idle_timeout');
+      else opts.handlers.onError?.('eof_paused');
+    }
     await sleep(backoffMs(attempt++), opts.signal);
   }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type JSX } from 'react';
+import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
 import { useConfig } from './config';
 import { loadChatRuntime, type ChatRuntime } from './chat-loader';
 
@@ -17,6 +17,13 @@ export function ChatConversationHost({
   const generationRef = useRef(0);
   const caseIdRef = useRef(caseId);
   caseIdRef.current = caseId;
+  const onLivePausedChangeRef = useRef(onLivePausedChange);
+  onLivePausedChangeRef.current = onLivePausedChange;
+  const onRuntimeUnavailableRef = useRef(onRuntimeUnavailable);
+  onRuntimeUnavailableRef.current = onRuntimeUnavailable;
+  const emitLivePausedChange = useCallback((paused: boolean) => {
+    onLivePausedChangeRef.current?.(paused);
+  }, []);
   const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
@@ -30,7 +37,7 @@ export function ChatConversationHost({
       if (cancelled || generation !== generationRef.current) return;
       if (!runtime) {
         setLoadFailed(true);
-        onRuntimeUnavailable?.();
+        onRuntimeUnavailableRef.current?.();
         return;
       }
       runtimeRef.current = runtime;
@@ -38,7 +45,7 @@ export function ChatConversationHost({
         container: host,
         config,
         caseId: caseIdRef.current,
-        onLivePausedChange,
+        onLivePausedChange: emitLivePausedChange,
       });
     });
 
@@ -47,7 +54,7 @@ export function ChatConversationHost({
       runtimeRef.current?.unmount();
       runtimeRef.current = null;
     };
-  }, [config, loadFailed, onLivePausedChange, onRuntimeUnavailable]);
+  }, [config, emitLivePausedChange, loadFailed]);
 
   useEffect(() => {
     runtimeRef.current?.setCaseId(caseId);

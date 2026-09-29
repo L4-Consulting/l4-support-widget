@@ -1,4 +1,4 @@
-:host {
+[data-l4-chat-host] {
   display: block;
   font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   font-size: 14px;
