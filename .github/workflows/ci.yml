@@ -4,6 +4,7 @@ on:
   pull_request:
   push:
     branches: [main]
+    tags: ['v*']
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -30,14 +31,28 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: 'Build (release: chat + manifest + global + ESM)'
+        run: npm run build:release
+
       - name: Unit tests
         run: npm test
 
-      - name: Build (global IIFE + ESM)
-        run: npm run build:only
-
-      - name: Bundle size (gzip; budget 60KB enforced)
+      - name: Bundle size (gzip; budget 66KB enforced)
         run: npm run size
+
+  verify-manifest:
+    name: verify:manifest (release gate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: verify:manifest
+        run: npm run verify:manifest
 
   e2e:
     name: Playwright (shadow-DOM spike)
@@ -53,6 +68,6 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
       - name: Build
-        run: npm run build:only
+        run: npm run build:release
       - name: E2E
         run: npm run test:e2e

@@ -43,6 +43,26 @@ describe('public API', () => {
     expect(getTokenProvider()).toBe(fn);
   });
 
+  it('renders with the registered token provider when init omits getToken', async () => {
+    act(() => {
+      setTokenProvider(() => null);
+      init({ productKey: 'civickit', apiBase: 'https://api.example.test' });
+    });
+    expect(getConfigError()).toBeNull();
+    await waitFor(() => {
+      expect(document.querySelector(ELEMENT_NAME)?.shadowRoot?.querySelector('[data-l4-launcher]')).not.toBeNull();
+    });
+  });
+
+  it('preserves explicit init provider precedence over the registered fallback', () => {
+    const explicit = () => null;
+    act(() => {
+      setTokenProvider(() => 'fallback');
+      init({ productKey: 'civickit', apiBase: 'https://api.example.test', getToken: explicit });
+    });
+    expect(getConfig()?.getToken).toBe(explicit);
+  });
+
   it('surfaces clear config errors without mounting', () => {
     const events: unknown[] = [];
     act(() => {

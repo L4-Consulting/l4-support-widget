@@ -1,0 +1,80 @@
+[data-l4-chat-host] {
+  display: block;
+  font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+  color: #111827;
+}
+
+.l4-chat-live-paused {
+  padding: 6px 10px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 12px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.l4-chat-stream {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 280px;
+  overflow: auto;
+  padding: 4px 0;
+}
+
+.l4-chat-bubble {
+  padding: 8px 12px;
+  border-radius: 10px;
+  max-width: 90%;
+  white-space: pre-wrap;
+}
+
+.l4-chat-bubble[data-side="customer"] {
+  align-self: flex-end;
+  background: #ecfdf5;
+}
+
+.l4-chat-bubble[data-side="l4"] {
+  align-self: flex-start;
+  background: #f3f4f6;
+}
+
+.l4-chat-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.l4-chat-composer textarea {
+  min-height: 72px;
+  padding: 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  resize: vertical;
+  font: inherit;
+}
+
+.l4-chat-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.l4-chat-composer button {
+  align-self: flex-end;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  background: #10b981;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}

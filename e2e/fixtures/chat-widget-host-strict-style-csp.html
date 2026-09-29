@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="script-src 'self' 'nonce-fixture'; style-src https://fonts.googleapis.com; style-src-elem https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://api.example.test"
+    />
+    <title>chat widget strict style-src host</title>
+    <script nonce="fixture">
+      window.__l4ConsoleErrors = [];
+      window.__l4StyleViolations = [];
+      document.addEventListener('securitypolicyviolation', (event) => {
+        if (event.effectiveDirective.startsWith('style-src')) window.__l4StyleViolations.push(event.blockedURI);
+      });
+      const originalError = console.error.bind(console);
+      console.error = (...args) => {
+        window.__l4ConsoleErrors.push(args.map(String).join(' '));
+        originalError(...args);
+      };
+    </script>
+  </head>
+  <body>
+    <script
+      id="l4-widget-script"
+      src="/l4-support-widget.js"
+      crossorigin="anonymous"
+      nonce="fixture"
+    ></script>
+    <script nonce="fixture">
+      const widgetScript = document.getElementById('l4-widget-script');
+      Object.defineProperty(document, 'currentScript', {
+        configurable: true,
+        get() {
+          return widgetScript;
+        },
+      });
+      function boot() {
+        if (!window.L4Support) return;
+        window.L4Support.init({
+          productKey: 'pk',
+          apiBase: 'https://api.example.test',
+          getToken: () => 'tok',
+          tabs: ['support'],
+          chat: { enabled: true },
+        });
+        window.L4Support.open();
+      }
+      if (window.L4Support) boot();
+      else widgetScript.addEventListener('load', boot);
+    </script>
+  </body>
+</html>

@@ -1,3 +1,4 @@
+import { destroyChatLoader } from './chat-loader';
 import { ELEMENT_NAME, registerElement } from './element';
 import { ConfigError, normalizeConfig, type L4SupportInit, type TokenProvider } from './config';
 import { removeDocumentFonts } from './styles';
@@ -23,6 +24,7 @@ export function getTokenProvider(): TokenProvider | null {
  * config. This is the ONLY place the ESM entry may trigger element registration.
  */
 export function init(opts: L4SupportInit): void {
+  opts = { ...opts, getToken: opts.getToken ?? getStoredTokenProvider() ?? undefined };
   try {
     normalizeConfig(opts, getStoredTokenProvider());
     lastError = null;
@@ -72,6 +74,7 @@ export function open(): void {
 
 export function destroy(): void {
   if (typeof document === 'undefined') return;
+  destroyChatLoader();
   document.querySelectorAll(ELEMENT_NAME).forEach((el) => el.remove());
   removeDocumentFonts(document);
   lastConfig = null;
