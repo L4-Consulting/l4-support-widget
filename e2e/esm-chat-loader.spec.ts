@@ -93,6 +93,7 @@ test.describe('ESM package host with explicit chat.assetUrl', () => {
         `http://127.0.0.1:${hostPort}/?hostPort=${hostPort}&modulePort=${modulePort}&chatPort=${chatPort}&mode=explicit`,
       );
       await page.waitForFunction(() => Boolean((window as Window & { L4SupportChat?: unknown }).L4SupportChat));
+      await expect(page.locator('l4-support-widget [data-l4-chat-mount] textarea')).toBeVisible();
       const state = await page.evaluate(() => {
         const hostEl = document.querySelector('l4-support-widget');
         const textarea = hostEl?.shadowRoot?.querySelector('[data-l4-chat-mount] textarea');

@@ -49,13 +49,6 @@ async function mockSupportApi(page: import('@playwright/test').Page) {
   });
 }
 
-async function chatMountVisible(page: import('@playwright/test').Page): Promise<boolean> {
-  return page.evaluate(() => {
-    const host = document.querySelector('l4-support-widget');
-    return Boolean(host?.shadowRoot?.querySelector('[data-l4-chat-mount] textarea'));
-  });
-}
-
 test.describe('chat loader via built global widget (two origins)', () => {
   test.beforeAll(() => {
     if (!existsSync(globalPath) || !existsSync(chatPath)) {
@@ -73,6 +66,7 @@ test.describe('chat loader via built global widget (two origins)', () => {
       await mockSupportApi(page);
       await page.goto('http://127.0.0.1:5299/');
       await page.waitForFunction(() => Boolean((window as Window & { L4SupportChat?: unknown }).L4SupportChat));
+      await expect(page.locator('l4-support-widget [data-l4-chat-mount] textarea')).toBeVisible();
       const textareaRadius = await page.evaluate(() => {
         const host = document.querySelector('l4-support-widget');
         const chatMount = host?.shadowRoot?.querySelector('[data-l4-chat-mount]');
@@ -170,9 +164,11 @@ test.describe('chat loader via built global widget (two origins)', () => {
           body: readFileSync(chatPath),
         });
       });
+      const firstChatRequest = page.waitForRequest((req) => req.url().includes('l4-support-widget-chat.js'));
       await page.goto('http://127.0.0.1:5320/', { waitUntil: 'domcontentloaded' });
-      await page.waitForRequest((req) => req.url().includes('l4-support-widget-chat.js'));
+      await firstChatRequest;
       await page.evaluate(() => window.L4Support.destroy());
+      await expect(page.locator('l4-support-widget')).toHaveCount(0);
       releaseChat();
       await page.evaluate(() => {
         window.L4Support.init({
@@ -185,7 +181,8 @@ test.describe('chat loader via built global widget (two origins)', () => {
         window.L4Support.open();
       });
       await page.waitForFunction(() => Boolean((window as Window & { L4SupportChat?: unknown }).L4SupportChat));
-      expect(await chatMountVisible(page)).toBe(true);
+      await expect(page.locator('l4-support-widget [data-l4-chat-mount] textarea')).toBeVisible();
+      await expect(page.locator('l4-support-widget')).toHaveCount(1);
     } finally {
       host.close();
       asset.close();
