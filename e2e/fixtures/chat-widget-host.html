@@ -12,7 +12,7 @@
   <body>
     <p id="fallback" hidden>legacy</p>
     <script>
-      const assetPort = ({ '5299': 5300, '5301': 5302, '5303': 5304, '5320': 5321 })[location.port] ?? 5300;
+      const assetPort = ({ '5299': 5300, '5301': 5302, '5303': 5304, '5320': 5321, '5360': 5361 })[location.port] ?? 5300;
       const assetOrigin = `http://127.0.0.1:${assetPort}`;
       const widgetScript = document.createElement('script');
       widgetScript.id = 'l4-widget-script';

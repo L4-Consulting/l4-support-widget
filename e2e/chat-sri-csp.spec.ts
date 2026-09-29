@@ -190,6 +190,44 @@ test.describe('chat loader via built global widget (two origins)', () => {
   });
 });
 
+test('direct DOM detach during asset load stays unmounted and reattaches cleanly', async ({ page }) => {
+  const host = serveFiles(5360, false, { '/': resolve(root, 'e2e/fixtures/chat-widget-host.html') });
+  const asset = serveFiles(5361, true, {
+    '/l4-support-widget.js': globalPath,
+    '/l4-support-widget-chat.js': chatPath,
+  });
+  try {
+    await mockSupportApi(page);
+    let releaseChat!: () => void;
+    const gate = new Promise<void>((resolve) => { releaseChat = resolve; });
+    await page.route('**/l4-support-widget-chat.js', async (route) => {
+      await gate;
+      await route.fulfill({ status: 200, contentType: 'application/javascript',
+        headers: { 'Access-Control-Allow-Origin': '*' }, body: readFileSync(chatPath) });
+    });
+    const requested = page.waitForRequest((request) => request.url().includes('l4-support-widget-chat.js'));
+    await page.goto('http://127.0.0.1:5360/', { waitUntil: 'domcontentloaded' });
+    await requested;
+    const detached = await page.evaluateHandle(() => {
+      const element = document.querySelector('l4-support-widget')!;
+      element.remove();
+      return element;
+    });
+    releaseChat();
+    await page.waitForFunction(() => Boolean(window.L4SupportChat));
+    await expect(page.locator('l4-support-widget')).toHaveCount(0);
+    expect(await detached.evaluate((element) => element.shadowRoot?.querySelector('[data-l4-chat-mount]'))).toBeNull();
+    await detached.evaluate((element) => { document.body.appendChild(element); window.L4Support.open(); });
+    await expect(page.locator('l4-support-widget [data-l4-chat-mount] textarea')).toBeVisible();
+    await expect(page.locator('l4-support-widget [data-l4-chat-mount]')).toHaveCount(1);
+    await page.evaluate(() => window.L4Support.destroy());
+    await expect(page.locator('l4-support-widget')).toHaveCount(0);
+  } finally {
+    host.close();
+    asset.close();
+  }
+});
+
 test.describe('chat loader CSP (same-origin enforcement)', () => {
   test('blocks dynamic chat script and emits chat_blocked_by_csp', async ({ page }) => {
     const port = 5310;
