@@ -51,22 +51,6 @@ describe('parseSseChunk', () => {
     expect(types).toEqual(['message', 'status']);
   });
 
-  it('preserves multibyte UTF-8 split across binary chunks', () => {
-    const encoder = new TextEncoder();
-    const full = 'data: {"body":"😀ok"}\n\n';
-    const bytes = encoder.encode(full);
-    const mid = Math.floor(bytes.length / 2);
-    let buffer = '';
-    const events: string[] = [];
-    for (const slice of [bytes.slice(0, mid), bytes.slice(mid)]) {
-      buffer += new TextDecoder().decode(slice, { stream: true });
-      const parsed = parseSseChunk(buffer);
-      buffer = parsed.rest;
-      for (const e of parsed.events) events.push(e.data);
-    }
-    expect(events).toEqual(['{"body":"😀ok"}']);
-  });
-
   it('ignores comment lines and coalesces multiline data', () => {
     const { events } = parseSseChunk(
       ': keep-alive\nevent: message\ndata: line1\ndata: line2\n\n',
@@ -75,6 +59,8 @@ describe('parseSseChunk', () => {
     expect(events[0].data).toBe('line1\nline2');
   });
 });
+
+const SSE_HEADERS = { get: (name: string) => (name.toLowerCase() === 'content-type' ? 'text/event-stream' : null) };
 
 describe('runCaseStream', () => {
   beforeEach(() => {
@@ -108,6 +94,7 @@ describe('runCaseStream', () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       status: 200,
+      headers: SSE_HEADERS,
       body,
     });
 
@@ -128,6 +115,61 @@ describe('runCaseStream', () => {
     controller.abort();
     await done;
     expect(events).toEqual(['message']);
+  });
+
+  it('reassembles UTF-8 split inside a multibyte code point across stream reads', async () => {
+    const encoder = new TextEncoder();
+    const frame = 'event: message\ndata: {"body":"😀ok"}\n\n';
+    const bytes = encoder.encode(frame);
+    const emojiByte = bytes.indexOf(0xf0);
+    expect(emojiByte).toBeGreaterThan(-1);
+    const splitAt = emojiByte + 2;
+
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: SSE_HEADERS,
+      body: {
+        getReader: () => {
+          let chunk = 0;
+          return {
+            read: async () => {
+              if (chunk === 0) {
+                chunk += 1;
+                return { done: false, value: bytes.slice(0, splitAt) };
+              }
+              if (chunk === 1) {
+                chunk += 1;
+                return { done: false, value: bytes.slice(splitAt) };
+              }
+              return { done: true, value: undefined };
+            },
+            releaseLock: () => undefined,
+            cancel: async () => undefined,
+          };
+        },
+      },
+    });
+
+    const payloads: Record<string, unknown>[] = [];
+    const controller = new AbortController();
+    const done = runCaseStream({
+      apiBase: 'https://api.example.test',
+      caseId: 'case-1',
+      productKey: 'pk',
+      getToken: () => 'tok',
+      cursor: null,
+      onCursor: () => undefined,
+      signal: controller.signal,
+      handlers: {
+        onEvent: (e) => {
+          payloads.push(e.data);
+          controller.abort();
+        },
+      },
+    });
+    await done;
+    expect(payloads).toEqual([{ body: '😀ok' }]);
   });
 
   it('resyncs once on invalid_cursor 400 then pauses on repeated 400', async () => {
@@ -289,6 +331,7 @@ describe('runCaseStream', () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       status: 200,
+      headers: SSE_HEADERS,
       body: makeBody(),
     });
 
@@ -333,6 +376,7 @@ describe('runCaseStream', () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       status: 200,
+      headers: SSE_HEADERS,
       body: {
         getReader: () => {
           let sent = false;
@@ -385,6 +429,7 @@ describe('runCaseStream', () => {
       return {
         ok: true,
         status: 200,
+        headers: SSE_HEADERS,
         body: {
           getReader: () => ({
             read: async () => ({ done: true, value: undefined }),
@@ -418,6 +463,7 @@ describe('runCaseStream', () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       status: 200,
+      headers: SSE_HEADERS,
       body: {
         getReader: () => {
           let sent = false;
@@ -457,6 +503,7 @@ describe('runCaseStream', () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       status: 200,
+      headers: SSE_HEADERS,
       body: {
         getReader: () => ({
           read: async () => ({ done: true, value: undefined }),

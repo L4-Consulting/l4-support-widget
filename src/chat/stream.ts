@@ -173,6 +173,20 @@ async function readErrorSnippet(response: Response, signal: AbortSignal): Promis
   }
 }
 
+function isEventStreamContentType(contentType: string | null): boolean {
+  if (!contentType) return false;
+  const mediaType = contentType.split(';', 1)[0]?.trim().toLowerCase() ?? '';
+  return mediaType === 'text/event-stream';
+}
+
+async function cancelResponseBody(body: ReadableStream<Uint8Array>): Promise<void> {
+  try {
+    await body.cancel();
+  } catch {
+    // ignore
+  }
+}
+
 function isInvalidCursorResponse(status: number, body: string): boolean {
   if (status !== 400) return false;
   try {
@@ -273,6 +287,14 @@ export async function runCaseStream(opts: CaseStreamOptions): Promise<void> {
 
     if (!response.ok || !response.body) {
       opts.handlers.onError?.(`http_${response.status}`);
+      await sleep(backoffMs(attempt++), opts.signal);
+      continue;
+    }
+
+    if (!isEventStreamContentType(response.headers.get('Content-Type'))) {
+      await cancelResponseBody(response.body);
+      if (opts.signal.aborted) return;
+      opts.handlers.onError?.('invalid_content_type');
       await sleep(backoffMs(attempt++), opts.signal);
       continue;
     }
