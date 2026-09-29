@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "buildId": "w2-chat-0.4.0",
+  "assets": {
+    "l4-support-widget-chat.js": {
+      "integrity": "sha384-kVLVm87kIQwZYKKfkoOSX/pa6usg+6uNDiDvMLuhlwmnZx8cqSNQy+pXOdw805gW"
+    }
+  }
+}

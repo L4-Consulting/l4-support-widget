@@ -10,6 +10,7 @@
  * build — ESM consumers never pull the side-effectful global bundle.
  */
 export { destroy, init, open, setTokenProvider, version } from './public-api';
+export { resolveChatAssetUrl } from './esm-chat-asset';
 export type { L4SupportInit, TokenProvider } from './config';
 export type {
   SupportCase,

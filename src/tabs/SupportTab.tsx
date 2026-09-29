@@ -4,6 +4,7 @@ import type { CaseCategory, CaseCsat, CaseDetail, CaseEvent, CaseMessage, CaseSe
 import { emitEvent, emitNarration, useConfig } from '../config';
 import { strings } from '../strings';
 import { useTabState } from '../tab-state';
+import { ChatConversationHost } from '../chat-bridge';
 import { CsatPanel } from './CsatPanel';
 import { supportStatusView, type SupportStatusGroup } from './support-status';
 import vegaAvatarUrl from '../assets/vega-profile-128.jpg';
@@ -76,10 +77,22 @@ export function SupportTab(): JSX.Element {
     setSelectedId(cases[0].id);
   }, [cases, rightPaneMode, selectedId]);
 
+  const chatEnabled = config.chat?.enabled === true;
+  const [chatRuntimeReady, setChatRuntimeReady] = useState(true);
+  const chatUsesSeparateAsset = chatEnabled && chatRuntimeReady;
+
+  useEffect(() => {
+    setChatRuntimeReady(true);
+  }, [chatEnabled, selectedId]);
+
   useEffect(() => {
     if (!selectedId || rightPaneMode === 'new') {
       setDetail(null);
       setDetailState('idle');
+      return;
+    }
+    if (chatUsesSeparateAsset) {
+      setDetailState('ready');
       return;
     }
     let alive = true;
@@ -133,7 +146,7 @@ export function SupportTab(): JSX.Element {
       stopPolling();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [api, rightPaneMode, selectedId]);
+  }, [api, chatUsesSeparateAsset, rightPaneMode, selectedId]);
 
   const trimmedQuery = query.trim();
 
@@ -316,6 +329,9 @@ export function SupportTab(): JSX.Element {
             onReply={onReply}
             replyError={replyError}
             onCsatSubmitted={onCsatSubmitted}
+            caseId={selectedId}
+            chatEnabled={chatUsesSeparateAsset}
+            onChatRuntimeUnavailable={() => setChatRuntimeReady(false)}
           />
         )}
       </section>
@@ -505,6 +521,9 @@ function CaseDetailPanel({
   onReply,
   replyError,
   onCsatSubmitted,
+  caseId,
+  chatEnabled,
+  onChatRuntimeUnavailable,
 }: {
   state: DetailState;
   detail: CaseDetail | null;
@@ -512,6 +531,9 @@ function CaseDetailPanel({
   onReply: (event: FormEvent<HTMLFormElement>) => void;
   replyError: string;
   onCsatSubmitted: (csat: CaseCsat) => void;
+  caseId: string | null;
+  chatEnabled: boolean;
+  onChatRuntimeUnavailable?: () => void;
 }): JSX.Element {
   const config = useConfig();
   const narratedMessageIds = useRef(new Set<string>());
@@ -532,9 +554,21 @@ function CaseDetailPanel({
   }, [config, detail]);
 
   if (state === 'idle') return <EmptyThread />;
-  if (state === 'loading') return <StateMessage tone="loading">{strings.caseLoading}</StateMessage>;
-  if (state === 'missing') return <StateMessage tone="empty">{strings.caseUnavailable}</StateMessage>;
-  if (state === 'error' || !detail) return <StateMessage tone="error">{strings.caseError}</StateMessage>;
+  if (!chatEnabled && state === 'loading') return <StateMessage tone="loading">{strings.caseLoading}</StateMessage>;
+  if (!chatEnabled && state === 'missing') return <StateMessage tone="empty">{strings.caseUnavailable}</StateMessage>;
+  if (!chatEnabled && (state === 'error' || !detail)) return <StateMessage tone="error">{strings.caseError}</StateMessage>;
+
+  if (chatEnabled) {
+    return (
+      <article className="l4-thread" data-l4-case-detail data-l4-chat-enabled>
+        <ChatConversationHost caseId={caseId} onRuntimeUnavailable={onChatRuntimeUnavailable} />
+      </article>
+    );
+  }
+
+  if (!detail) {
+    return <StateMessage tone="error">{strings.caseError}</StateMessage>;
+  }
 
   const showCsat = supportStatusView(detail.case.status).group === 'resolved';
 

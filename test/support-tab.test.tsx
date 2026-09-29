@@ -28,6 +28,7 @@ function renderSupport(configOverrides: Partial<NormalizedConfig> = {}) {
     launcher: { enabled: true, position: 'br', avatar: false },
     avatar: { enabled: false },
     voice: { enabled: false },
+    chat: { enabled: false },
     ...configOverrides,
   };
   const config: NormalizedConfig = { ...baseConfig, productLabel: configOverrides.productLabel ?? baseConfig.productLabel };

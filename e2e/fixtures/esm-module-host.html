@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ESM module host</title>
+    <script>
+      window.__l4ConsoleErrors = [];
+      window.addEventListener('error', (e) => window.__l4ConsoleErrors.push(String(e.message || e)));
+    </script>
+  </head>
+  <body>
+    <p id="fallback" hidden>legacy</p>
+    <script type="module">
+      const ports = {
+        host: Number(new URL(import.meta.url).searchParams.get('hostPort')),
+        module: Number(new URL(import.meta.url).searchParams.get('modulePort')),
+        chat: Number(new URL(import.meta.url).searchParams.get('chatPort')),
+      };
+      const mode = new URL(import.meta.url).searchParams.get('mode') ?? 'explicit';
+      const moduleUrl = `http://127.0.0.1:${ports.module}/esm-module-host.js`;
+      await import(moduleUrl);
+      const chatAssetUrl = `http://127.0.0.1:${ports.chat}/l4-support-widget-chat.js`;
+      if (mode === 'explicit') {
+        window.__l4BootEsm(chatAssetUrl, true);
+      } else if (mode === 'off') {
+        window.__l4BootEsm(chatAssetUrl, false);
+      } else if (mode === 'no-asset') {
+        window.__l4BootEsm('', true);
+      }
+    </script>
+  </body>
+</html>

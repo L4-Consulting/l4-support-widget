@@ -32,6 +32,7 @@ function renderPanel({ initialCsat = null, onSubmitted = vi.fn() }: RenderPanelO
     launcher: { enabled: true, position: 'br', avatar: false },
     avatar: { enabled: false },
     voice: { enabled: false },
+    chat: { enabled: false },
   });
   return {
     client,

@@ -1,3 +1,4 @@
+import { destroyChatLoader } from './chat-loader';
 import { ELEMENT_NAME, registerElement } from './element';
 import { ConfigError, normalizeConfig, type L4SupportInit, type TokenProvider } from './config';
 import { removeDocumentFonts } from './styles';
@@ -72,6 +73,7 @@ export function open(): void {
 
 export function destroy(): void {
   if (typeof document === 'undefined') return;
+  destroyChatLoader();
   document.querySelectorAll(ELEMENT_NAME).forEach((el) => el.remove());
   removeDocumentFonts(document);
   lastConfig = null;

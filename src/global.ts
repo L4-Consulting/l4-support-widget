@@ -1,3 +1,5 @@
+import './widget-asset-base';
+
 /**
  * Global IIFE entry -> `dist/l4-support-widget.js` for <script> embeds.
  *

@@ -31,6 +31,7 @@ function config(overrides: Partial<NormalizedConfig> = {}): NormalizedConfig {
     launcher: { enabled: true, position: 'br', avatar: false },
     avatar: { enabled: false },
     voice: { enabled: false },
+    chat: { enabled: false },
     ...overrides,
   };
   return { ...baseConfig, productLabel: overrides.productLabel ?? baseConfig.productLabel };

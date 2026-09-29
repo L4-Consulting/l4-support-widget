@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="script-src 'nonce-fixture'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://api.example.test"
+    />
+    <title>chat widget csp host</title>
+    <script nonce="fixture">
+      window.__l4CspEvents = [];
+      window.__violations = [];
+      document.addEventListener('securitypolicyviolation', (event) => {
+        window.__violations.push(event.blockedURI || '');
+      });
+    </script>
+  </head>
+  <body>
+    <p id="fallback" hidden>legacy</p>
+    <script
+      id="l4-widget-script"
+      src="/l4-support-widget.js"
+      crossorigin="anonymous"
+      nonce="fixture"
+    ></script>
+    <script src="/unrelated-blocked.js" crossorigin="anonymous"></script>
+    <script nonce="fixture">
+      const widgetScript = document.getElementById('l4-widget-script');
+      Object.defineProperty(document, 'currentScript', {
+        configurable: true,
+        get() {
+          return widgetScript;
+        },
+      });
+      function boot() {
+        if (!window.L4Support) return;
+        window.L4Support.init({
+          productKey: 'pk',
+          apiBase: 'https://api.example.test',
+          getToken: () => 'tok',
+          tabs: ['support'],
+          chat: { enabled: true },
+          onEvent: (event) => {
+            if (event.type === 'chat_blocked_by_csp') window.__l4CspEvents.push(event.type);
+            if (event.type === 'chat_load_failed') document.getElementById('fallback').hidden = false;
+          },
+        });
+        window.L4Support.open();
+      }
+      if (window.L4Support) boot();
+      else widgetScript.addEventListener('load', boot);
+    </script>
+  </body>
+</html>

@@ -34,6 +34,11 @@ export interface L4SupportInit {
   /** Host callback invoked once for each rendered agent message while voice is enabled. */
   onNarrate?: (message: NarrationMessage) => void;
   onEvent?: (e: { type: string; [k: string]: unknown }) => void;
+  /**
+   * When `chat.enabled` is true, loads the separate chat IIFE.
+   * ESM hosts must supply `assetUrl` (or use `resolveChatAssetUrl` with a known module URL).
+   */
+  chat?: { enabled?: boolean; assetUrl?: string };
 }
 
 export type SupportTabId = 'help' | 'support' | 'roadmap';
@@ -68,6 +73,11 @@ export interface NormalizedConfig {
   };
   onNarrate?: (message: NarrationMessage) => void;
   onEvent?: (event: WidgetEvent) => void;
+  chat: {
+    enabled: boolean;
+    /** Set when the host supplies a validated explicit chat IIFE URL. */
+    assetUrl?: string;
+  };
 }
 
 export class ConfigError extends Error {
@@ -138,7 +148,42 @@ export function normalizeConfig(opts: L4SupportInit, fallbackTokenProvider?: Tok
     voice: { enabled: opts.voice?.enabled === true, provider: voiceProvider },
     onNarrate: opts.onNarrate,
     onEvent: opts.onEvent,
+    chat: normalizeChat(opts.chat),
   };
+}
+
+const CHAT_ASSET_PATH_SUFFIX = '/l4-support-widget-chat.js';
+
+export function validateChatAssetUrl(value: string): string {
+  let url: URL;
+  try {
+    url = new URL(value.trim());
+  } catch {
+    throw new ConfigError('L4Support.init chat.assetUrl must be an absolute http(s) URL.');
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new ConfigError('L4Support.init chat.assetUrl must use http: or https:.');
+  }
+  if (url.username || url.password) {
+    throw new ConfigError('L4Support.init chat.assetUrl must not include URL credentials.');
+  }
+  if (!url.pathname.endsWith(CHAT_ASSET_PATH_SUFFIX)) {
+    throw new ConfigError(`L4Support.init chat.assetUrl pathname must end with ${CHAT_ASSET_PATH_SUFFIX}.`);
+  }
+  return url.href;
+}
+
+function normalizeChat(chat: L4SupportInit['chat']): NormalizedConfig['chat'] {
+  const enabled = chat?.enabled === true;
+  if (!enabled) {
+    return { enabled: false };
+  }
+  const rawAsset =
+    typeof chat?.assetUrl === 'string' && chat.assetUrl.trim().length > 0 ? chat.assetUrl.trim() : undefined;
+  if (rawAsset) {
+    return { enabled: true, assetUrl: validateChatAssetUrl(rawAsset) };
+  }
+  return { enabled: true };
 }
 
 export function emitEvent(config: Pick<NormalizedConfig, 'onEvent'> | null, event: WidgetEvent): void {
