@@ -2,7 +2,8 @@ import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-test('built flag-off global preserves polling, authenticated requests, and public globals', async ({ page }) => {
+for (const registeredProvider of [false, true]) {
+test(`built flag-off global preserves polling, authenticated requests, and public globals (registered provider: ${registeredProvider})`, async ({ page }) => {
   const requests: Array<{ url: string; authorization: string | undefined }> = [];
   await page.route('https://api.example.test/**', async (route) => {
     requests.push({ url: route.request().url(), authorization: route.request().headers().authorization });
@@ -14,9 +15,14 @@ test('built flag-off global preserves polling, authenticated requests, and publi
   await page.addScriptTag({ content: readFileSync(resolve('dist/l4-support-widget.js'), 'utf8') });
   const addedGlobals = await page.evaluate((names) => Object.getOwnPropertyNames(window).filter((name) => !names.includes(name)), before);
   expect(addedGlobals.sort()).toEqual(['L4Support']);
-  await page.evaluate(() => window.L4Support.init({
-    productKey: 'civickit', apiBase: 'https://api.example.test', getToken: () => 'synthetic-token', tabs: ['support', 'help'],
-  }));
+  await page.evaluate((registered) => {
+    if (registered) window.L4Support.setTokenProvider(() => 'synthetic-token');
+    window.L4Support.init({
+      productKey: 'civickit', apiBase: 'https://api.example.test',
+      ...(registered ? {} : { getToken: () => 'synthetic-token' }),
+      tabs: ['support', 'help'],
+    });
+  }, registeredProvider);
   await expect(page.locator('l4-support-widget [data-l4-launcher]')).toBeVisible();
   await expect.poll(() => requests.length).toBe(1);
   await page.clock.runFor(19_999);
@@ -40,3 +46,4 @@ test('built flag-off global preserves polling, authenticated requests, and publi
   await page.clock.runFor(40_000);
   expect(requests).toHaveLength(5);
 });
+}

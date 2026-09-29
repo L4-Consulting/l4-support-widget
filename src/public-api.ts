@@ -24,6 +24,7 @@ export function getTokenProvider(): TokenProvider | null {
  * config. This is the ONLY place the ESM entry may trigger element registration.
  */
 export function init(opts: L4SupportInit): void {
+  opts = { ...opts, getToken: opts.getToken ?? getStoredTokenProvider() ?? undefined };
   try {
     normalizeConfig(opts, getStoredTokenProvider());
     lastError = null;

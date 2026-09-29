@@ -48,6 +48,15 @@ init({
 open();
 ```
 
+## Token provider lifecycle
+
+`init({ getToken })` uses that explicit provider. When `getToken` is omitted,
+`init` captures the provider previously registered with `setTokenProvider(fn)`.
+The getter is called for requests, so it can return a refreshed token for the
+same identity. Use `init` again to replace the configured getter; use `destroy`
+before initializing a different signed-in identity. `setTokenProvider` registers
+a fallback and does not override an explicitly configured getter.
+
 ## Build and verification
 
 `npm ci` builds declarations without regenerating the trusted manifest.
